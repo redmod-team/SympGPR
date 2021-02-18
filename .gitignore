@@ -1,0 +1,13 @@
+__pycache__
+*.dll
+*.so
+*.pyc
+*.pyd
+*~
+*.mod
+outcmaes
+*.o
+*.pyf
+*.dylib
+*.npz
+*.png
