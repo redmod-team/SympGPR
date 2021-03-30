@@ -1,5 +1,5 @@
 FC = gfortran
-FFLAGS = -Wall -march=native -O2 -g -fbacktrace
+FFLAGS = -Wall -march=native -O3 -g -fbacktrace
 PYTHON = python3
 NAME = kernels
 

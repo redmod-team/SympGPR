@@ -11,3 +11,4 @@ outcmaes
 *.dylib
 *.npz
 *.png
+.vscode
