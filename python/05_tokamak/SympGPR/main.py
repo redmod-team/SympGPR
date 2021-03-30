@@ -13,7 +13,7 @@ import tkinter
 import matplotlib
 # matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error 
+from sklearn.metrics import mean_squared_error
 import scipy
 from calc_fieldlines import q, Q, p, P, zqtrain, zptrain, ztrain, X0test, yinttest, xtrain, Ntest, nm, N
 from scipy.integrate import solve_ivp
@@ -23,7 +23,7 @@ from mpl_toolkits.mplot3d import Axes3D
 sig2_n = 1e-12 #noise**2 in observations
 
 Q0map = X0test[:,1]
-P0map = X0test[:,0]*1e2 
+P0map = X0test[:,0]*1e2
 
 #%% set up GP
 # as indicated in Algorithm 1: Semi-implicit symplectic GP map
@@ -66,7 +66,7 @@ print('Optimized lengthscales for mixed GP: lq =', "{:.2f}".format(l[0]), 'lp = 
 
 #%%
 #build K(x,x') and regularized inverse with sig2_n
-# K(x,x') corresponds to L(q,P,q',P') given in Eq. (38) 
+# K(x,x') corresponds to L(q,P,q',P') given in Eq. (38)
 hyp = np.hstack((l, sig))
 K = np.empty((2*N, 2*N))
 build_K(xtrain, xtrain, hyp, K)
