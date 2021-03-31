@@ -63,8 +63,7 @@ def buildKreg(xin, x0in, hyp, K):
     y = xin[N:2*N]
     for k in range(N):
         for lk in range(N0):
-            K[k,lk] = f_kern(
-                     x0[lk], y0[lk], x[k], y[k], l)
+            K[k,lk] = f_kern(x0[lk], y0[lk], x[k], y[k], l)
     K[:,:] = sig*K[:,:]
 
 def build_dK(xin, x0in, hyp):
@@ -183,9 +182,8 @@ def nll_grad(hyp, x, y, N):
     ])
     return nlp_val, nlp_grad
 
-def guessP(x, y, hypp, xtrainp, ztrainp, Kyinvp, N):
-    Ntest = 1
-    Kstar = np.empty((Ntest, int(len(xtrainp)/2)))
+def guessP(x, y, hypp, xtrainp, ztrainp, Kyinvp):
+    Kstar = np.empty((1, int(len(xtrainp)/2)))
     buildKreg(np.hstack((x,y)), xtrainp, hypp, Kstar)
     Ef = Kstar.dot(Kyinvp.dot(ztrainp))
     return Ef
@@ -206,15 +204,16 @@ def Pnewton(P, x, y, l, xtrain, Kyinv, ztrain):
     # print(pGP[0])
     return f
 
-def calcP(x,y, l, hypp, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv, Ntest):
-    # as P is given in an implicit relation, use newton to solve for P (Eq. (42))
+def calcP(x,y, l, hypp, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv):
+    # as P is given in an implicit relation, use newton to solve for P (Eq.(42))
     # use the GP on regular grid (q,p) for a first guess for P
-    pgss = guessP([x], [y], hypp, xtrainp, ztrainp, Kyinvp, Ntest)
+    pgss = guessP([x], [y], hypp, xtrainp, ztrainp, Kyinvp)
     res, r = newton(Pnewton, pgss, full_output=True, maxiter=50000, disp=True,
         args = (np.array([x]), np.array ([y]), l, xtrain, Kyinv, ztrain))
     return res
 
-def applymap_tok(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv):
+def applymap_tok(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp,
+    xtrain, ztrain, Kyinv):
     # Application of symplectic map
     #init
     pmap = np.zeros([nm, Ntest])
@@ -228,8 +227,9 @@ def applymap_tok(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp, xtr
             if np.isnan(pmap[i, k]):
                 pmap[i+1,k] = np.nan
             else:
-                pmap[i+1, k] = calcP(qmap[i,k], pmap[i, k], l, hypp, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv, Ntest)
-                
+                pmap[i+1, k] = calcP(qmap[i,k], pmap[i, k], l, hypp, xtrainp,
+                    ztrainp, Kyinvp, xtrain, ztrain, Kyinv)
+
                 zk = np.array([pmap[i+1, k]*1e-2, qmap[i,k], 0])
                 temp = fieldlines.compute_r(zk, 0.3)
                 if temp > 0.5 or pmap[i+1, k] < 0.0:
@@ -238,9 +238,7 @@ def applymap_tok(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp, xtr
             if np.isnan(pmap[i+1, k]):
                 qmap[i+1,k] = np.nan
             else:
-                # then: set new Q via calculating \Delta q and adding q 
+                # then: set new Q via calculating \Delta q and adding q
                 dqmap = calcQ(qmap[i,k], pmap[i+1,k], xtrain, l, Kyinv, ztrain)
                 qmap[i+1, k] = np.mod(dqmap + qmap[i, k], 2.0*np.pi)
     return qmap, pmap
-
-
