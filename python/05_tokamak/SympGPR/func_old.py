@@ -1,5 +1,6 @@
 import numpy as np
 from func import f_kern, d2kdxdx0, d2kdxdy0, d2kdydx0, d2kdydy0
+from scipy.optimize import newton, bisect
 
 def build_K(xin, x0in, hyp, K):
     # set up covariance matrix with derivative observations, Eq. (38)
@@ -44,3 +45,26 @@ def guessP(x, y, hypp, xtrainp, ztrainp, Kyinvp):
     buildKreg(np.hstack((x,y)), xtrainp, hypp, Kstar)
     Ef = Kstar.dot(Kyinvp.dot(ztrainp))
     return Ef
+
+def calcQ(x,y, xtrain, l, Kyinv, ztrain):
+    # get \Delta q from GP on mixed grid.
+    Kstar = np.empty((len(xtrain), 2), order='F')
+    build_K(xtrain, np.hstack(([x], [y])), l, Kstar)
+    qGP = Kstar.T.dot(Kyinv.dot(ztrain))
+    dq = qGP[1]
+    return dq
+
+def Pnewton(P, x, y, l, xtrain, Kyinv, ztrain):
+    Kstar = np.empty((len(xtrain), 2), order='F')
+    build_K(xtrain, np.hstack((x, P)), l, Kstar)
+    pGP = Kstar.T.dot(Kyinv.dot(ztrain))
+    f = pGP[0] - y + P
+    return f
+
+def calcP(x,y, l, hypp, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv):
+    # as P is given in an implicit relation, use newton to solve for P (Eq.(42))
+    # use the GP on regular grid (q,p) for a first guess for P
+    pgss = guessP([x], [y], hypp, xtrainp, ztrainp, Kyinvp)
+    res, r = newton(Pnewton, pgss, full_output=True, maxiter=50000, disp=True,
+        args = (np.array([x]), np.array([y]), l, xtrain, Kyinv, ztrain))
+    return res

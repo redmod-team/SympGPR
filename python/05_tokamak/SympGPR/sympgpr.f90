@@ -72,13 +72,18 @@ function guessP(x, y, hypp, xtrainp, ytrainp, ztrainp, Kyinvp)
     guessP = dot_product(Kstar(1,:), matmul(Kyinvp, ztrainp))
 end function guessP
 
-! def calcQ(x,y, xtrain, l, Kyinv, ztrain):
-!     # get \Delta q from GP on mixed grid.
-!     Kstar = np.empty((len(xtrain), 2))
-!     build_K(xtrain, np.hstack(([x], [y])), l, Kstar)
-!     qGP = Kstar.T.dot(Kyinv.dot(ztrain))
-!     dq = qGP[1]
-!     return dq
+function calcQ(x, y, xtrain, ytrain, hyp, Kyinv, ztrain)
+    ! get \Delta q from GP on mixed grid.
+    real(8) :: calcQ
+    real(8), intent(in) :: x(:), y(:)
+    real(8), intent(in) :: hyp(3)
+    real(8), intent(in) :: xtrain(:), ytrain(:), ztrain(:)
+    real(8), intent(in) :: Kyinv(:,:)
+
+    real(8) :: Kstar(2, 2*size(xtrain))
+    call build_K(x, y, xtrain, ytrain, hyp, Kstar)
+    calcQ = dot_product(Kstar(2, :), matmul(Kyinv, ztrain))
+end function calcQ
 
 ! def Pnewton(P, x, y, l, xtrain, Kyinv, ztrain):
 !     Kstar = np.empty((len(xtrain), 2))
@@ -100,12 +105,31 @@ function calcP(x, y, hyp, hypp, xtrainp, ytrainp, ztrainp, Kyinvp, &
     real(8), intent(in) :: xtrain(:), ytrain(:), ztrain(:)
     real(8), intent(in) :: Kyinv(:,:)
 
-    calcP = guessP(x, y, hypp, xtrainp, ytrainp, ztrainp, Kyinvp)
+    integer :: info
+    real(8) :: pgss(1), fvec(1)
 
-    ! TODO iterations
-    !res, r = newton(Pnewton, pgss, full_output=True, maxiter=50000, disp=True,
-    !    args = (np.array([x]), np.array ([y]), l, xtrain, Kyinv, ztrain))
-    !return res
+    pgss(1) = guessP(x, y, hypp, xtrainp, ytrainp, ztrainp, Kyinvp)
+    call target(1, pgss, fvec, info)
+
+    ! pgss = 1.08172922d0
+    call hybrd1(target, 1, pgss, fvec, 1d-13, info)
+    calcP = pgss(1)
+
+    contains
+
+    subroutine target(n, p, f, iflag)
+        integer, intent(in) :: n
+        real(8), intent(in) :: p(n)
+        real(8), intent(out) :: f(n)
+        integer, intent(in) :: iflag
+
+        real(8) :: pGP
+        real(8) :: Kstar(2, 2*size(xtrain))
+        call build_K(x, p, xtrain, ytrain, hyp, Kstar)
+        pGP = dot_product(Kstar(1, :), matmul(Kyinv, ztrain))
+        f(1) = pGP - y(1) + p(1)
+
+    end subroutine target
 end function calcP
 
 
