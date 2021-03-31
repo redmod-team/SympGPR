@@ -45,7 +45,7 @@ sigp = 10**res.x[2]
 hypp = np.hstack((lp, sigp))
 print('Optimized lengthscales for regular GP: lq =', "{:.2f}".format(lp[0]), 'lp = ', "{:.2f}".format(lp[1]), 'sig = ', "{:.2f}".format(sigp))
 # build K and its inverse
-Kp = np.zeros((N, N))
+Kp = np.zeros((N, N), order='F')
 buildKreg(xtrainp, xtrainp, hypp, Kp)
 Kyinvp = scipy.linalg.inv(Kp + sig2_n*np.eye(Kp.shape[0]))
 #%%
@@ -54,8 +54,9 @@ Kyinvp = scipy.linalg.inv(Kp + sig2_n*np.eye(Kp.shape[0]))
 
 def nll_transform_grad(log10hyp, sig2n, x, y, N):
     hyp = log10hyp
-    out = nll_grad(np.hstack((hyp, [sig2n])), x, y, N)
-    return out[0]
+    return nll_chol(np.hstack((hyp, [sig2n])), x, y, N)
+    #out = nll_grad(np.hstack((hyp, [sig2n])), x, y, N)
+    #return out[0]
 res = minimize(nll_transform_grad, np.array((0.5, 0.5, 10)), args = (sig2_n, xtrain, ztrain.T.flatten(), 2*N), method='L-BFGS-B')
 
 sol1 = res.x[0:2]
@@ -68,7 +69,7 @@ print('Optimized lengthscales for mixed GP: lq =', "{:.2f}".format(l[0]), 'lp = 
 #build K(x,x') and regularized inverse with sig2_n
 # K(x,x') corresponds to L(q,P,q',P') given in Eq. (38)
 hyp = np.hstack((l, sig))
-K = np.empty((2*N, 2*N))
+K = np.empty((2*N, 2*N), order='F')
 build_K(xtrain, xtrain, hyp, K)
 Kyinv = scipy.linalg.inv(K + sig2_n*np.eye(K.shape[0]))
 
