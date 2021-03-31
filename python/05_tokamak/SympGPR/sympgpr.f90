@@ -129,8 +129,8 @@ subroutine applymap_tok(nm, Ntest, hyp, hypp, Q0map, P0map, xtrainp, ytrainp, &
     ztrainp, Kyinvp, xtrain, ytrain, ztrain, Kyinv, qmap, pmap)
 
     !! Application of symplectic map
-    integer, intent(in) :: nm
-    integer, intent(in) :: Ntest
+    integer :: nm
+    integer :: Ntest
     real(8), intent(in) :: hyp(3), hypp(3)
     real(8), intent(in) :: Q0map(Ntest), P0map(Ntest)
     real(8), intent(in) :: xtrainp(:), ytrainp(:), ztrainp(:), Kyinvp(:, :)

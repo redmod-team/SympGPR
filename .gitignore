@@ -12,3 +12,7 @@ outcmaes
 *.npz
 *.png
 .vscode
+*.pickle
+*.prof
+callgrind.*
+.gitignore

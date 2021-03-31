@@ -83,6 +83,10 @@ outtrain = mean_squared_error(ztrain, Eftrain)
 print('training error', "{:.1e}".format(outtrain))
 
 #%% Application of symplectic map
+import pickle
+data = (nm, Ntest, hyp, hypp, Q0map, P0map, xtrainp, ztrainp,
+    Kyinvp, xtrain, ztrain, Kyinv)
+pickle.dump(data, open('test.pickle', 'wb'))
 qmap, pmap = applymap_tok(
     nm, Ntest, hyp, hypp, Q0map, P0map, xtrainp, ztrainp,
     Kyinvp, xtrain, ztrain, Kyinv)

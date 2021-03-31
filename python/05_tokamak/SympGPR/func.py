@@ -209,3 +209,19 @@ def applymap_tok(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp,
                 dqmap = calcQ(qmap[i,k], pmap[i+1,k], xtrain, l, Kyinv, ztrain)
                 qmap[i+1, k] = np.mod(dqmap + qmap[i, k], 2.0*np.pi)
     return qmap, pmap
+
+# To use Fortran applymap_tok (no significant speedup)
+# def applymap_tok(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp,
+#     xtrain, ztrain, Kyinv):
+#     # Application of symplectic map
+#     #init
+#     pmap = np.zeros([nm, Ntest, 1], order='F')
+#     qmap = np.zeros([nm, Ntest, 1], order='F')
+
+#     Ntrain = len(xtrain)//2
+#     Ntrainp = len(xtrainp)//2
+#     sympgpr.applymap_tok(l, hypp, Q0map, P0map,
+#         xtrainp[:Ntrainp], xtrainp[Ntrainp:], ztrainp, Kyinvp,
+#         xtrain[:Ntrain], xtrain[Ntrain:], ztrain, Kyinv, qmap, pmap)
+
+#     return qmap[:,:,0], pmap[:,:,0]

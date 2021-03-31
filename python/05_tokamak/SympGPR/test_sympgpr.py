@@ -1,5 +1,6 @@
 #%%
 import numpy as np
+import pickle
 
 from sympgpr import sympgpr
 
@@ -9,13 +10,13 @@ x0 = np.array([1.0, 2.0])
 y0 = np.array([0.0, 3.0])
 N = len(x)
 N0 = len(x0)
-hyp = np.array([0.5, 2.0, 0.4])
 
 def run_test():
     print('==============================================')
     print('Testing equivalence of func.py and sympgpr.f90')
     print('==============================================')
 
+    hyp = np.array([0.5, 2.0, 0.4])
 
     K = np.empty([N, N0], order='F')
     buildKreg(np.hstack((x,y)), np.hstack((x0,y0)), hyp, K)
@@ -73,8 +74,29 @@ def run_test():
     assert(np.allclose(p, p_fort, rtol=1e-12, atol=1e-12))
     print('calcP matches')
 
-from func import buildKreg, build_K, guessP, calcQ, calcP
+    (nm, Ntest, hyp, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp,
+    xtrain, ztrain, Kyinv) = pickle.load(open('test.pickle','rb'))
+
+    qmap, pmap = applymap_tok(2, Ntest, hyp, hypp, Q0map, P0map,
+        xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv)
+
+    qmap_fort = np.zeros([2, Ntest, 1], order='F')
+    pmap_fort = np.zeros([2, Ntest, 1], order='F')
+
+    Ntrain = len(xtrain)//2
+    Ntrainp = len(xtrainp)//2
+    sympgpr.applymap_tok(hyp, hypp, Q0map, P0map,
+        xtrainp[:Ntrainp], xtrainp[Ntrainp:], ztrainp, Kyinvp,
+        xtrain[:Ntrain], xtrain[Ntrain:], ztrain, Kyinv, qmap_fort, pmap_fort)
+
+    assert(np.allclose(qmap, qmap_fort[:,:,0], rtol=1e-8, atol=1e-8))
+    assert(np.allclose(pmap, pmap_fort[:,:,0], rtol=1e-8, atol=1e-8))
+    print('applymap_tok matches')
+
+from func import buildKreg, build_K, guessP, calcQ, calcP, applymap_tok
 run_test()
 
-from func_old import buildKreg, build_K, guessP, calcQ, calcP
+from func_old import buildKreg, build_K, guessP, calcQ, calcP, applymap_tok
 run_test()
+
+# %%
