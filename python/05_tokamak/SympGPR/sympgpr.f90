@@ -72,21 +72,18 @@ function guessP(x, y, hypp, xtrainp, ytrainp, ztrainp, Kyinvp)
     guessP = dot_product(Kstar(1,:), matmul(Kyinvp, ztrainp))
 end function guessP
 
-! def calcQ(x,y, xtrain, l, Kyinv, ztrain):
-!     # get \Delta q from GP on mixed grid.
-!     Kstar = np.empty((len(xtrain), 2))
-!     build_K(xtrain, np.hstack(([x], [y])), l, Kstar)
-!     qGP = Kstar.T.dot(Kyinv.dot(ztrain))
-!     dq = qGP[1]
-!     return dq
+function calcQ(x, y, xtrain, ytrain, hyp, Kyinv, ztrain)
+    ! get \Delta q from GP on mixed grid.
+    real(8) :: calcQ
+    real(8), intent(in) :: x(:), y(:)
+    real(8), intent(in) :: hyp(3)
+    real(8), intent(in) :: xtrain(:), ytrain(:), ztrain(:)
+    real(8), intent(in) :: Kyinv(:,:)
 
-! def Pnewton(P, x, y, l, xtrain, Kyinv, ztrain):
-!     Kstar = np.empty((len(xtrain), 2))
-!     build_K(xtrain, np.hstack((x, P)), l, Kstar)
-!     pGP = Kstar.T.dot(Kyinv.dot(ztrain))
-!     f = pGP[0] - y + P
-!     # print(pGP[0])
-!     return f
+    real(8) :: Kstar(2, 2*size(xtrain))
+    call build_K(x, y, xtrain, ytrain, hyp, Kstar)
+    calcQ = dot_product(Kstar(2, :), matmul(Kyinv, ztrain))
+end function calcQ
 
 function calcP(x, y, hyp, hypp, xtrainp, ytrainp, ztrainp, Kyinvp, &
     xtrain, ytrain, ztrain, Kyinv)
@@ -100,59 +97,83 @@ function calcP(x, y, hyp, hypp, xtrainp, ytrainp, ztrainp, Kyinvp, &
     real(8), intent(in) :: xtrain(:), ytrain(:), ztrain(:)
     real(8), intent(in) :: Kyinv(:,:)
 
-    calcP = guessP(x, y, hypp, xtrainp, ytrainp, ztrainp, Kyinvp)
+    integer :: info
+    real(8) :: pgss(1), fvec(1)
 
-    ! TODO iterations
-    !res, r = newton(Pnewton, pgss, full_output=True, maxiter=50000, disp=True,
-    !    args = (np.array([x]), np.array ([y]), l, xtrain, Kyinv, ztrain))
-    !return res
+    pgss(1) = guessP(x, y, hypp, xtrainp, ytrainp, ztrainp, Kyinvp)
+    call target(1, pgss, fvec, info)
+
+    ! pgss = 1.08172922d0
+    call hybrd1(target, 1, pgss, fvec, 1d-13, info)
+    calcP = pgss(1)
+
+    contains
+
+    subroutine target(n, p, f, iflag)
+        integer, intent(in) :: n
+        real(8), intent(in) :: p(n)
+        real(8), intent(out) :: f(n)
+        integer, intent(in) :: iflag
+
+        real(8) :: pGP
+        real(8) :: Kstar(2, 2*size(xtrain))
+        call build_K(x, p, xtrain, ytrain, hyp, Kstar)
+        pGP = dot_product(Kstar(1, :), matmul(Kyinv, ztrain))
+        f(1) = pGP - y(1) + p(1)
+
+    end subroutine target
 end function calcP
 
 
-! subroutine applymap_tok(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, &
-!     Kyinvp, xtrain, ztrain, Kyinv, qmap, pmap)
+subroutine applymap_tok(nm, Ntest, hyp, hypp, Q0map, P0map, xtrainp, ytrainp, &
+    ztrainp, Kyinvp, xtrain, ytrain, ztrain, Kyinv, qmap, pmap)
 
-!     !! Application of symplectic map
-!     integer, intent(in) :: nm
-!     integer, intent(in) :: Ntest
-!     real(8), intent(in) :: l
-!     real(8), intent(out) :: pmap(nm, Ntest)
-!     real(8), intent(out) :: qmap(nm, Ntest)
+    !! Application of symplectic map
+    integer :: nm
+    integer :: Ntest
+    real(8), intent(in) :: hyp(3), hypp(3)
+    real(8), intent(in) :: Q0map(Ntest), P0map(Ntest)
+    real(8), intent(in) :: xtrainp(:), ytrainp(:), ztrainp(:), Kyinvp(:, :)
+    real(8), intent(in) :: xtrain(:), ytrain(:), ztrain(:), Kyinv(:, :)
+    real(8), intent(inout) :: pmap(nm, Ntest, 1)
+    real(8), intent(inout) :: qmap(nm, Ntest, 1)
 
-!     integer :: i, k
-!     real(8) :: zk(3), r, dqmap
+    integer :: i, k
+    real(8) :: zk(3), r, dqmap
 
-!     ! set initial conditions
-!     pmap(1,:) = P0map
-!     qmap(1,:) = Q0map
-!     ! loop through all test points and all time steps
-!     do i = 1, nm-1
-!         do k = 1, Ntest
-!             if ( isnan(pmap(i, k)) ) then
-!                 continue
-!             else
-!                 pmap(i+1, k) = calcP(qmap(i,k), pmap(i,k), l, hypp, xtrainp, &
-!                     ztrainp, Kyinvp, xtrain, ztrain, Kyinv, Ntest)
+    ! set initial conditions
+    pmap(1,:,1) = P0map
+    qmap(1,:,1) = Q0map
+    ! loop through all test points and all time steps
+    do i = 1, nm-1
+        do k = 1, Ntest
+            if ( isnan(pmap(i, k, 1)) ) then
+                continue
+            else
+                pmap(i+1, k, 1) = calcP(qmap(i,k,:), pmap(i,k,:), hyp, hypp, &
+                    xtrainp, ytrainp, ztrainp, Kyinvp, xtrain, ytrain, ztrain, &
+                    Kyinv)
 
-!                 zk(1) = pmap(i+1, k)*1d-2
-!                 zk(2) = qmap(i,k)
-!                 zk(3) = 0.0d0
-!                 r = compute_r(zk, 0.3d0)
-!                 if ( (r > 0.5d0) .or. pmap(i+1, k) < 0.0d0 ) then
-!                     continue
-!                 end if
-!             end if
-!         end do
-!         do k = 1, Ntest
-!             if ( isnan(pmap(i+1, k)) ) then
-!                 continue
-!             else
-!                 ! then: set new Q via calculating \Delta q and adding q
-!                 dqmap=calcQ(qmap(i,k), pmap(i+1,k), xtrain, l, Kyinv, ztrain)
-!                 qmap(i+1, k) = mod(dqmap + qmap(i, k), 2.0d0*pi)
-!             end if
-!         end do
-!     end do
-! end subroutine applymap_tok
+                zk(1) = pmap(i+1, k, 1)*1d-2
+                zk(2) = qmap(i,k, 1)
+                zk(3) = 0.0d0
+                r = compute_r(zk, 0.3d0)
+                if ( (r > 0.5d0) .or. pmap(i+1, k, 1) < 0.0d0 ) then
+                    continue
+                end if
+            end if
+        end do
+        do k = 1, Ntest
+            if ( isnan(pmap(i+1, k, 1)) ) then
+                continue
+            else
+                ! then: set new Q via calculating \Delta q and adding q
+                dqmap=calcQ(qmap(i,k,:), pmap(i+1,k,:), xtrain, ytrain, hyp, &
+                    Kyinv, ztrain)
+                qmap(i+1, k, 1) = mod(dqmap + qmap(i, k, 1), 2.0d0*pi)
+            end if
+        end do
+    end do
+end subroutine applymap_tok
 
 end module sympgpr

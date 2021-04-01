@@ -6,7 +6,6 @@ Created on Tue Apr 21 16:47:00 2020
 """
 
 import numpy as np
-from scipy.optimize import newton, bisect
 from scipy.linalg import solve_triangular
 import scipy
 from fieldlines import fieldlines
@@ -169,28 +168,16 @@ def nll_grad(hyp, x, y, N):
     return nlp_val, nlp_grad
 
 def calcQ(x,y, xtrain, l, Kyinv, ztrain):
-    # get \Delta q from GP on mixed grid.
-    Kstar = np.empty((len(xtrain), 2), order='F')
-    build_K(xtrain, np.hstack(([x], [y])), l, Kstar)
-    qGP = Kstar.T.dot(Kyinv.dot(ztrain))
-    dq = qGP[1]
-    return dq
-
-def Pnewton(P, x, y, l, xtrain, Kyinv, ztrain):
-    Kstar = np.empty((len(xtrain), 2), order='F')
-    build_K(xtrain, np.hstack((x, P)), l, Kstar)
-    pGP = Kstar.T.dot(Kyinv.dot(ztrain))
-    f = pGP[0] - y + P
-    # print(pGP[0])
-    return f
+    Ntrain = len(xtrain)//2
+    return sympgpr.calcq(
+        x, y, xtrain[:Ntrain], xtrain[Ntrain:], l, Kyinv, ztrain)
 
 def calcP(x,y, l, hypp, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv):
-    # as P is given in an implicit relation, use newton to solve for P (Eq.(42))
-    # use the GP on regular grid (q,p) for a first guess for P
-    pgss = guessP([x], [y], hypp, xtrainp, ztrainp, Kyinvp)
-    res, r = newton(Pnewton, pgss, full_output=True, maxiter=50000, disp=True,
-        args = (np.array([x]), np.array ([y]), l, xtrain, Kyinv, ztrain))
-    return res
+    Ntrain = len(xtrain)//2
+    Ntrainp = len(xtrainp)//2
+    return sympgpr.calcp(x, y, l, hypp, xtrainp[:Ntrainp], xtrainp[Ntrainp:],
+        ztrainp, Kyinvp, xtrain[:Ntrain], xtrain[Ntrain:], ztrain, Kyinv)
+
 
 def applymap_tok(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp,
     xtrain, ztrain, Kyinv):
@@ -222,3 +209,19 @@ def applymap_tok(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp,
                 dqmap = calcQ(qmap[i,k], pmap[i+1,k], xtrain, l, Kyinv, ztrain)
                 qmap[i+1, k] = np.mod(dqmap + qmap[i, k], 2.0*np.pi)
     return qmap, pmap
+
+# To use Fortran applymap_tok (no significant speedup)
+# def applymap_tok(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp,
+#     xtrain, ztrain, Kyinv):
+#     # Application of symplectic map
+#     #init
+#     pmap = np.zeros([nm, Ntest, 1], order='F')
+#     qmap = np.zeros([nm, Ntest, 1], order='F')
+
+#     Ntrain = len(xtrain)//2
+#     Ntrainp = len(xtrainp)//2
+#     sympgpr.applymap_tok(l, hypp, Q0map, P0map,
+#         xtrainp[:Ntrainp], xtrainp[Ntrainp:], ztrainp, Kyinvp,
+#         xtrain[:Ntrain], xtrain[Ntrain:], ztrain, Kyinv, qmap, pmap)
+
+#     return qmap[:,:,0], pmap[:,:,0]
