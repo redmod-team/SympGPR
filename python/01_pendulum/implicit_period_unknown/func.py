@@ -16,16 +16,16 @@ from scipy.integrate import solve_ivp
 from kernels import *
 
 def f_kern(x, y, x0, y0, l):
-    return kern_num(x,y,x0,y0,l[0], l[1])
+    return kern_num(x,y,x0,y0,l[0], l[1], l[2])
 
 def d2kdxdx0(x, y, x0, y0, l):
-    return d2kdxdx0_num(x,y,x0,y0,l[0], l[1])
+    return d2kdxdx0_num(x,y,x0,y0,l[0], l[1], l[2])
 
 def d2kdydy0(x, y, x0, y0, l):
-    return d2kdydy0_num(x,y,x0,y0,l[0], l[1])
+    return d2kdydy0_num(x,y,x0,y0,l[0], l[1], l[2])
 
 def d2kdxdy0(x, y, x0, y0, l):
-    return d2kdxdy0_num(x,y,x0,y0,l[0], l[1])
+    return d2kdxdy0_num(x,y,x0,y0,l[0], l[1], l[2])
 
 def d2kdydx0(x, y, x0, y0, l):
     return d2kdxdy0(x, y, x0, y0, l)

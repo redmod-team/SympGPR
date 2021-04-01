@@ -11,7 +11,6 @@ from scipy.linalg import solve_triangular
 import scipy
 from sklearn.metrics import mean_squared_error 
 
-from scipy.integrate import solve_ivp
 
 from kernels import *
 
@@ -29,16 +28,6 @@ def d2kdxdy0(x, y, x0, y0, l):
 
 def d2kdydx0(x, y, x0, y0, l):
     return d2kdxdy0(x, y, x0, y0, l)
-
-def intode(y, t, dtsymp):
-    ys = np.zeros([2, len(t)])
-    ys[0,0] = y[0]
-    ys[1,0] = y[1]            
-
-    for kt in range(1,len(t)):
-            ys[1, kt]=ys[1, kt-1] - dtsymp*(np.sin(ys[0, kt-1] + np.pi))
-            ys[0, kt]=ys[0, kt-1] + dtsymp*ys[1, kt]
-    return ys.T
 
 def build_K(xin, x0in, hyp, K):
     # set up covariance matrix with derivative observations, Eq. (38)
@@ -77,7 +66,118 @@ def buildKreg(xin, x0in, hyp, K):
             K[k,lk] = f_kern(
                      x0[lk], y0[lk], x[k], y[k], l) 
     K[:,:] = sig*K[:,:]
+    
+def build_dKreg(xin, x0in, hyp):
 
+    l = hyp[:-1]
+    sig = hyp[-1]
+    N = len(xin)//2
+    N0 = len(x0in)//2
+    x0 = x0in[0:N0]
+    x = xin[0:N]
+    y0 = x0in[N0:2*N0]
+    y = xin[N:2*N]
+    Kp = np.empty((N, N0))
+    
+    dK = []
+    for k in range(N):
+        for lk in range(N0):
+            Kp[k,lk] = sig*dkdlx_num(
+                     x0[lk], y0[lk], x[k], y[k], l[0], l[1]) 
+
+    dK.append(Kp.copy())
+
+    for k in range(N):
+        for lk in range(N0):
+            Kp[k,lk] = sig*dkdly_num(
+                     x0[lk], y0[lk], x[k], y[k], l[0], l[1]) 
+
+    dK.append(Kp.copy())
+    return dK
+
+def build_dK(xin, x0in, hyp):
+    # set up covariance matrix
+    N = len(xin)//2
+    N0 = len(x0in)//2
+    l = hyp[:-1]
+    sig = hyp[-1]
+    x0 = x0in[0:N0]
+    x = xin[0:N]
+    y0 = x0in[N0:2*N0]
+    y = xin[N:2*N]
+    k11 = np.empty((N0, N))
+    k12 = np.empty((N0, N))
+    k21 = np.empty((N0, N))
+    k22 = np.empty((N0, N))
+
+    dK = []
+    
+    for k in range(N0):
+        for lk in range(N):
+              k11[k,lk] = sig*d3kdxdx0dlx_num(
+                  x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+              k21[k,lk] = sig*d3kdxdy0dlx_num(
+                  x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+              k12[k,lk] = sig*d3kdxdy0dlx_num(
+                  x0[k], y0[k], x[lk], y[lk], l[0], l[1])  
+              k22[k,lk] = sig*d3kdydy0dlx_num(
+                  x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+        
+    dK.append(np.vstack([
+        np.hstack([k11, k12]),
+        np.hstack([k21, k22])
+    ]))
+
+    for k in range(N0):
+        for lk in range(N):
+             k11[k,lk] = sig*d3kdxdx0dly_num(
+                 x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+             k21[k,lk] = sig*d3kdxdy0dly_num(
+                 x0[k], y0[k], x[lk], y[lk], l[0], l[1])  
+             k12[k,lk] = sig*d3kdxdy0dly_num(
+                  x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+             k22[k,lk] = sig*d3kdydy0dly_num(
+                 x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+        
+    dK.append(np.vstack([
+        np.hstack([k11, k12]),
+        np.hstack([k21, k22])
+    ]))
+    #dK[:,:] = sig*dK
+    return dK
+    
+
+def nll_grad_reg(hyp, x, y, N):
+    K = np.empty((N, N))
+    buildKreg(x, x, hyp[:-1], K)
+    Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
+    Kyinv = np.linalg.inv(Ky)                # invert GP matrix
+    alpha = Kyinv.dot(y)
+    nlp_val = 0.5*y.T.dot(alpha) + 0.5*np.linalg.slogdet(Ky)[1]
+    dK = build_dKreg(x, x, hyp[:-1])
+
+    nlp_grad = np.array([
+        -0.5*alpha.T.dot(dK[0].dot(alpha)) + 0.5*np.trace(Kyinv.dot(dK[0])),
+        -0.5*alpha.T.dot(dK[1].dot(alpha)) + 0.5*np.trace(Kyinv.dot(dK[1]))
+    ])
+
+    return nlp_val, nlp_grad
+
+def nll_grad(hyp, x, y, N):
+    K = np.empty((N, N))
+    build_K(x, x, hyp[:-1], K)
+    Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
+    Kyinv = np.linalg.inv(Ky)                # invert GP matrix
+    alpha = Kyinv.dot(y)
+    nlp_val = 0.5*y.T.dot(alpha) + 0.5*np.linalg.slogdet(Ky)[1]
+    dK = build_dK(x, x, hyp[:-1])
+
+    nlp_grad = np.array([
+        -0.5*alpha.T.dot(dK[0].dot(alpha)) + 0.5*np.trace(Kyinv.dot(dK[0])),
+        -0.5*alpha.T.dot(dK[1].dot(alpha)) + 0.5*np.trace(Kyinv.dot(dK[1]))
+    ])
+
+    return nlp_val, nlp_grad
 
 
 def gpsolve(Ky, ft):
@@ -99,14 +199,11 @@ def nll_chol(hyp, x, y, N, buildK = build_K):
     K = np.empty((N, N))
     build_K(x, x, hyp[:-1], K)
     Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
-    L = scipy.linalg.cholesky(Ky, lower = True)
+    L = scipy.linalg.cholesky(Ky, lower = True, check_finite = False)
     alpha = solve_cholesky(L, y)
     ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
     return ret
  
-def energy(x, U0): 
-    return x[1]**2/2 + U0*(1 - np.cos(x[0]))
-
 def guessP(x, y, hypp, xtrainp, ztrainp, Kyinvp, N):    
     Ntest = 1
     Kstar = np.empty((Ntest, int(len(xtrainp)/2)))
@@ -139,7 +236,7 @@ def calcP(x,y, l, hypp, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv, Ntest):
 
 def applymap(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv):
     # Application of symplectic map
-    #init
+  
     pmap = np.zeros([nm, Ntest])
     qmap = np.zeros([nm, Ntest])
     #set initial conditions
@@ -160,26 +257,11 @@ def applymap(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp, xtrain,
                 qmap[i+1, k] = np.mod(qmap[i+1,k] + qmap[i, k], 2.0*np.pi)
     return qmap, pmap
 
-def dydt_ivp(t, y):
-    ydot = np.zeros([2])
-    ydot[0] = y[1] 
-    ydot[1] = -np.sin(y[0]+np.pi)
-    return ydot
-
-def integrate_pendulum(q0, p0, t):   
-    ysint = []
-    for ik in range(len(q0)):
-        res_int = solve_ivp(dydt_ivp, [t[0], t[-1]], np.array((q0[ik], p0[ik])),t_eval = t,  method='RK45', rtol = 1e-13, atol = 1e-16)
-        temp = res_int.y
-        ysint.append(temp)
-    return ysint
-
-
-def quality(qmap, pmap, H, ysint, Ntest, Nm):
+def quality(qmap, pmap, H, ysint, Ntest):
     #geom. distance
     gd = np.zeros([Ntest])        
     for lk in range(0,Ntest):
-        gd[lk] = mean_squared_error(([qmap[1, lk], pmap[1, lk]]),ysint[Nm, :, lk])
+        gd[lk] = mean_squared_error(([qmap[1, lk], pmap[1, lk]]),ysint[:, lk, 1])
     stdgd = np.std(gd[:])
     # Energy oscillation
     Eosc = np.zeros([Ntest])
@@ -188,12 +270,3 @@ def quality(qmap, pmap, H, ysint, Ntest, Nm):
     return Eosc, gd, stdgd
 
 
-def symplEuler_pendulum(q0, p0, t, dt):
-    #yint = np.zeros([len(t), 2, len(q0)]) # initial values for y
-    ysint = np.zeros([len(t), 2, len(q0)]) # initial values for y
-
-    for k in range(len(q0)):    
-    #     yint[:, :, k] = spint.odeint(dydt, [q0[k], p0[k]], t)
-        ysint[:,:, k] = intode([q0[k], p0[k]], t, dt)
-        # ysint[:,0, k] = np.mod(ysint[:,0, k], 2*np.pi)    
-    return ysint

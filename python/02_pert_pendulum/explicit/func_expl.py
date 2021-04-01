@@ -11,7 +11,7 @@ import scipy
 from scipy.integrate import solve_ivp
 
 
-from kernels_sum import *
+from kernels import *
 
 
 def f_kern(x, y, x0, y0, l):
@@ -77,6 +77,56 @@ def build_K(xin, x0in, hyp, K):
 def energy(x, U0): 
     return x[1]**2/2 + U0*(1 - np.cos(x[0]))
 
+def build_dK(xin, x0in, hyp):
+    # set up covariance matrix
+    N = len(xin)//2
+    N0 = len(x0in)//2
+    l = hyp[:-1]
+    sig = hyp[-1]
+    x0 = x0in[0:N0]
+    x = xin[0:N]
+    y0 = x0in[N0:2*N0]
+    y = xin[N:2*N]
+    k11 = np.empty((N0, N))
+    k12 = np.empty((N0, N))
+    k21 = np.empty((N0, N))
+    k22 = np.empty((N0, N))
+
+    dK = []
+    
+    for k in range(N0):
+        for lk in range(N):
+              k11[k,lk] = sig*d3kdxdx0dlx_num(
+                  x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+              k21[k,lk] = sig*d3kdxdy0dlx_num(
+                  x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+              k12[k,lk] = sig*d3kdxdy0dlx_num(
+                  x0[k], y0[k], x[lk], y[lk], l[0], l[1])  
+              k22[k,lk] = sig*d3kdydy0dlx_num(
+                  x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+        
+    dK.append(np.vstack([
+        np.hstack([k11, k12]),
+        np.hstack([k21, k22])
+    ]))
+
+    for k in range(N0):
+        for lk in range(N):
+             k11[k,lk] = sig*d3kdxdx0dly_num(
+                 x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+             k21[k,lk] = sig*d3kdxdy0dly_num(
+                 x0[k], y0[k], x[lk], y[lk], l[0], l[1])  
+             k12[k,lk] = sig*d3kdxdy0dly_num(
+                  x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+             k22[k,lk] = sig*d3kdydy0dly_num(
+                 x0[k], y0[k], x[lk], y[lk], l[0], l[1]) 
+        
+    dK.append(np.vstack([
+        np.hstack([k11, k12]),
+        np.hstack([k21, k22])
+    ]))
+    #dK[:,:] = sig*dK
+    return dK
 
 # compute log-likelihood according to RW, p.19
 def solve_cholesky(L, b):
@@ -94,7 +144,21 @@ def nll_chol(hyp, x, y):
     ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
     return ret
 
+def nll_grad(hyp, x, y, N):
+    K = np.empty((N, N))
+    build_K(x, x, hyp[:-1], K)
+    Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
+    Kyinv = np.linalg.inv(Ky)                # invert GP matrix
+    alpha = Kyinv.dot(y)
+    nlp_val = 0.5*y.T.dot(alpha) + 0.5*np.linalg.slogdet(Ky)[1]
+    dK = build_dK(x, x, hyp[:-1])
 
+    nlp_grad = np.array([
+        -0.5*alpha.T.dot(dK[0].dot(alpha)) + 0.5*np.trace(Kyinv.dot(dK[0])),
+        -0.5*alpha.T.dot(dK[1].dot(alpha)) + 0.5*np.trace(Kyinv.dot(dK[1]))
+    ])
+
+    return nlp_val, nlp_grad
 def calcQ(x,y, xtrain, l, Kyinv, ztrain, Ntest):
     Kstar = np.empty((len(xtrain), 2))
     build_K(xtrain, np.hstack(([x], [y])), l, Kstar)
