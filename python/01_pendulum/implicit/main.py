@@ -9,7 +9,7 @@ import numpy as np
 import random
 import ghalton
 from scipy.optimize import minimize
-from common.func import (build_K, buildKreg, applymap, nll_chol, quality)
+from func import (build_K, buildKreg, applymap, nll_chol, quality)
 # import tkinter
 # import matplotlib
 # matplotlib.use('TkAgg')
@@ -40,11 +40,11 @@ def integrate_pendulum(q0, p0, t):
 #%% init parameters
 Nm = 200 #mapping time (Nm = 200 for Fig. 3; Nm = 900 for Fig. 5)
 N = 20 #training data (N = 20 for Fig. 3; N = 30 for Fig. 5)
-U0 = 1 
+U0 = 1
 nm = 2000 # how often the map should be applied
 dtsymp = 0.001 #integration step for producing training data
 sig2_n = 1e-12 #noise**2 in observations
-Ntest = 15 # number of testpoints
+Ntest = 1 # number of testpoints
 
 #define boundaries for training data
 qmin = 0.0
@@ -152,6 +152,8 @@ print('training error', "{:.1e}".format(outtrain))
 
 #%% Application of symplectic map
 start = time.time()
+Q0map = np.array([2.1+np.pi])
+P0map = np.array([0.0])
 qmap, pmap = applymap(
     nm, Ntest, hyp, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv)
 end = time.time()

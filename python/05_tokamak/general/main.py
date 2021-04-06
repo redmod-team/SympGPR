@@ -15,7 +15,7 @@ import cma
 from mpl_toolkits.mplot3d import Axes3D
 from calc_fieldlines import (X0test, yinttest, Ntest, nphmap, N, nm, q, Q, p, P, zqtrain, zptrain, ztrain, xtrain, yintSE, nph_SE, nph)
 #%% init parameters
-sig2_n = 1e-6 #noise**2 in observations
+sig2_n = 1e-14 #noise**2 in observations
 Q0map = X0test[:,1]
 P0map = X0test[:,0]*1e2
 

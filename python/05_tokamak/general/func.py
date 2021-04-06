@@ -6,7 +6,7 @@ from sklearn.metrics import mean_squared_error
 from fieldlines import fieldlines
 from scipy.integrate import solve_ivp
 from sympgpr import sympgpr
-
+from scipy.sparse.linalg import eigsh
 from kernels import *
 
 def f_kern(x, y, x0, y0, l):
@@ -126,23 +126,67 @@ def solve_cholesky(L, b):
 
 # negative log-posterior
 def nll_chol_reg(hyp, x, y, N):
+    neig = len(x)//2
     K = np.empty((N, N), order='F')
     buildKreg(x, x, hyp[:-1], K)
     Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
-    L = scipy.linalg.cholesky(Ky, lower = True)
-    alpha = solve_cholesky(L, y)
-    ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
+    # L = scipy.linalg.cholesky(Ky, lower = True)
+    # alpha = solve_cholesky(L, y)
+    # ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
+    # return ret
+    # if (neig <= 0 or neig > 0.05*len(x)):
+    try:
+        L = scipy.linalg.cholesky(Ky, lower = True)
+        alpha = solve_cholesky(L, y)
+        ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
+        return ret
+    except:
+        print('Warning! Fallback to eig solver!')
+        w, Q = eigsh(Ky, neig, tol=max(1e-6*np.abs(hyp[-1]), 1e-15))
+    # while np.abs(w[0]-hyp[-1])/hyp[-1] > 1e-6 and neig < len(x):
+    #     if neig > 0.05*len(x):  # TODO: get more stringent criterion
+    #         try:
+    #             return nll_chol(hyp, x, y, build_K)
+    #         except:
+    #             print('Warning! Fallback to eig solver!')
+    #     neig =  2*neig
+    #     w, Q = eigsh(Ky, neig, tol=max(1e-6*hyp[-1], 1e-15))
+
+        alpha = Q.dot(np.diag(1.0/w).dot(Q.T.dot(y)))    
+    
+
+        ret = 0.5*y.T.dot(alpha) + 0.5*(np.sum(np.log(w)) + (len(x)-neig)*np.log(np.abs(hyp[-1])))
     return ret
+
 # negative log-posterior
 def nll_chol(hyp, x, y, N):
+    neig = len(x)
     K = np.empty((N, N), order='F')
     build_K(x, x, hyp[:-1], K)
     Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
-    L = scipy.linalg.cholesky(Ky, lower = True)
-    alpha = solve_cholesky(L, y)
-    ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
+    # if (neig <= 0 or neig > 0.05*len(x)):
+    try:
+        L = scipy.linalg.cholesky(Ky, lower = True)
+        alpha = solve_cholesky(L, y)
+        ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
+        return ret
+    except:
+        print('Warning! Fallback to eig solver!')
+        w, Q = eigsh(Ky, neig, tol=max(1e-6*np.abs(hyp[-1]), 1e-15))
+    # while np.abs(w[0]-hyp[-1])/hyp[-1] > 1e-6 and neig < len(x):
+        # if neig > 0.05*len(x):  # TODO: get more stringent criterion
+            # try:
+                # return nll_chol(hyp, x, y, build_K)
+            # except:
+                # print('Warning! Fallback to eig solver!')
+        # neig =  2*neig
+        # w, Q = eigsh(Ky, neig, tol=max(1e-6*hyp[-1], 1e-15))
+
+        alpha = Q.dot(np.diag(1.0/w).dot(Q.T.dot(y)))    
+    
+
+        ret = 0.5*y.T.dot(alpha) + 0.5*(np.sum(np.log(w)) + (len(x)-neig)*np.log(np.abs(hyp[-1])))
     return ret
- 
 
 def guessP(x, y, hypp, xtrainp, ztrainp, Kyinvp):
     Ntrain = len(xtrainp)//2

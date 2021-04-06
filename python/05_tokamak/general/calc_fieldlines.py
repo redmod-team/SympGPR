@@ -11,12 +11,13 @@ import random
 # Attention: Variables are [pth, th, ph], so momentum in first component and
 #            "time" in third. Change to usual Z = z[:,1::-1] before using!
 #
-N = 50 # training data N = 70 for eps = 0.001
+N = 60 # training data N = 70 for eps = 0.001
 nphmap = 4
 nm = 100*nphmap
 nturn = 2 # Number of full turns
 nph = 100     # Number of steps per turn
-
+mod_m = -3
+mod_n = 2
 eps =  0.001 
 seq = ghalton.Halton(3)
 X0 = seq.get(N)*array([0.38, 2*pi, 0])+array([0.1, 0, 0])#
@@ -27,7 +28,7 @@ for ipart in range(0, N):
     r0 = X0[ipart, 0]
     th0 = X0[ipart, 1]
     ph0 = X0[ipart, 2]
-    fieldlines.init(nph=nph, am=-3, an=2, aeps=eps, aphase=0.0, arlast=r0)
+    fieldlines.init(nph=nph, am=mod_m, an=mod_n, aeps=eps, aphase=0.0, arlast=r0)
     pth0 = qe/c*fieldlines.ath(r0, th0, ph0)
 
     z = zeros([nph*nturn + 1, 3])
@@ -83,7 +84,7 @@ X0test = np.stack((Q0map, P0map, np.zeros(Ntest))).T
 start = time()
 yinttest = zeros([nph*nturntest + 1, 3, Ntest])
 for ipart in range(0, Ntest):
-    fieldlines.init(nph=nph, am=-3, an=2, aeps=eps, aphase=0.0, arlast=X0test[ipart,0])
+    fieldlines.init(nph=nph, am=mod_m, an=mod_n, aeps=eps, aphase=0.0, arlast=X0test[ipart,0])
     X0test[ipart, 0] = qe/c*fieldlines.ath(X0test[ipart,0], X0test[ipart,1], X0test[ipart,2])
     
     temp = zeros([nph*nturntest + 1, 3])
@@ -105,7 +106,7 @@ nph_SE = 16
 yintSE = zeros([nph_SE*nturntest + 1, 3, Ntest])
 X0test_SE = np.stack((Q0map, P0map, np.zeros(Ntest))).T
 for ipart in range(0, Ntest):
-    fieldlines.init(nph=nph_SE, am=-3, an=2, aeps=eps, aphase=0.0, arlast=X0test_SE[ipart,0])
+    fieldlines.init(nph=nph_SE, am=mod_m, an=mod_n, aeps=eps, aphase=0.0, arlast=X0test_SE[ipart,0])
     X0test_SE[ipart, 0] = qe/c*fieldlines.ath(X0test_SE[ipart,0], X0test_SE[ipart,1], X0test_SE[ipart,2])
     temp = zeros([nph_SE*nturntest + 1, 3])
     temp[0,:] = [X0test_SE[ipart,0], X0test_SE[ipart,1], 0.0]
