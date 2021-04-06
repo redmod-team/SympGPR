@@ -1,7 +1,7 @@
 import numpy as np
 import ghalton
 import time
-nm = 200 #map applications
+nm = 1000 #map applications
 e = 0.5
 om = 0.5
 def zdot(t, z): #perturbed pendulum
@@ -46,7 +46,6 @@ def rk_pmap(z,eps,n_rk_steps = 100):
         k4 = zdot(phi_current + dphi, z_current + dphi * k3)
         z_current = z_current + (1.0/6.0) * dphi * (k1 + 2*k2 + 2*k3 + k4)
         phi_current = phi_current + dphi
-        #print(phi_current)
         out[:,:,i] = z_current
     return out, z_current
 
@@ -93,6 +92,7 @@ xic2 = 0.0*np.ones([nics//2,1])
 zic = np.hstack([np.vstack([xic,xic2]),np.vstack([yic,yic2])])
 qs = zic[:,0]
 ps = zic[:,1]
+
 #%%
 start = time.time()
 yinttest = np.zeros([2,Ntest,nm])

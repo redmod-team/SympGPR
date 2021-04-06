@@ -9,7 +9,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from fieldlines import fieldlines
 import ghalton
-from profit.util.halton import halton
+#from profit.util.halton import halton
 from random import randint
 import random
 #

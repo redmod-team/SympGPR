@@ -195,13 +195,6 @@ def nll_chol(hyp, x, y, N):
     ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
     return ret
  
-# def guessP(x, y, hypp, xtrainp, ztrainp, Kyinvp, N):    
-#     Ntest = 1
-#     Kstar = np.empty((Ntest, int(len(xtrainp)/2)))
-#     buildKreg(np.hstack((x,y)), xtrainp, hypp, Kstar)
-#     Ef = Kstar.dot(Kyinvp.dot(ztrainp))
-#     return Ef
-
 def guessP(x, y, hypp, xtrainp, ztrainp, Kyinvp):
     Ntrain = len(xtrainp)//2
     return sympgpr.guessp(
@@ -243,11 +236,34 @@ def applymap(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp, xtrain,
                 qmap[i+1, k] = np.mod(qmap[i+1,k] + qmap[i, k], 2.0*np.pi)
     return qmap, pmap
 
-def quality(qmap, pmap, H, ysint, Ntest):
+def applymap_henon(nm, Ntest, l, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv):
+    # Application of symplectic map
+  
+    pmap = np.zeros([nm, Ntest])
+    qmap = np.zeros([nm, Ntest])
+    #set initial conditions
+    pmap[0,:] = P0map
+    qmap[0,:] = Q0map
+    
+    # loop through all test points and all time steps
+    for i in range(0,nm-1):
+        for k in range(0, Ntest): 
+            # set new P including Newton for implicit Eq (42)
+            pmap[i+1, k] = calcP(qmap[i,k], pmap[i, k], l, hypp, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv)
+        for k in range(0, Ntest):
+            if np.isnan(pmap[i+1, k]):
+                qmap[i+1,k] = np.nan
+            else: 
+                # then: set new Q via calculating \Delta q and adding q (Eq. (43))
+                qmap[i+1, k] = calcQ(qmap[i,k], pmap[i+1,k], xtrain, l, Kyinv, ztrain)
+                qmap[i+1, k] = (qmap[i+1,k] + qmap[i, k])
+    return qmap, pmap
+
+def quality(qmap, pmap, H, ysint, Ntest, Nm):
     #geom. distance
     gd = np.zeros([Ntest])        
     for lk in range(0,Ntest):
-        gd[lk] = mean_squared_error(([qmap[1, lk], pmap[1, lk]]),ysint[:, lk, 1])
+        gd[lk] = mean_squared_error(([qmap[1, lk], pmap[1, lk]]),ysint[Nm, :, lk])
     stdgd = np.std(gd[:])
     # Energy oscillation
     Eosc = np.zeros([Ntest])

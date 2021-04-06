@@ -73,7 +73,7 @@ codegen([('kern_num', kern),
          ('d3kdxdx0dly_num', d3kdxdx0dly),
          ('d3kdydy0dly_num', d3kdydy0dly),
          ('d3kdxdy0dly_num', d3kdxdy0dly),
-         ], "F95", "kernels_sq",
+         ], "F95", "kernels",
         argument_sequence=seq,
         header=False, empty=False)
 with open(name, 'w') as f:

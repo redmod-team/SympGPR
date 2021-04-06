@@ -16,3 +16,4 @@ outcmaes
 *.prof
 callgrind.*
 .gitignore
+.DS_Store

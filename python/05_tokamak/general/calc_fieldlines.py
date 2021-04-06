@@ -11,12 +11,12 @@ import random
 # Attention: Variables are [pth, th, ph], so momentum in first component and
 #            "time" in third. Change to usual Z = z[:,1::-1] before using!
 #
-N = 42 # training data N = 70 for eps = 0.001
-nm = 5000
+N = 50 # training data N = 70 for eps = 0.001
+nphmap = 4
+nm = 100*nphmap
 nturn = 2 # Number of full turns
-nph = 500     # Number of steps per turn
+nph = 100     # Number of steps per turn
 
-nphmap = 5
 eps =  0.001 
 seq = ghalton.Halton(3)
 X0 = seq.get(N)*array([0.38, 2*pi, 0])+array([0.1, 0, 0])#
@@ -101,7 +101,7 @@ print('Time high accuracy sympl. Euler: ', end-start)
 
 # low accuracy sympl. Euler
 start = time()
-nph_SE = 8
+nph_SE = 16
 yintSE = zeros([nph_SE*nturntest + 1, 3, Ntest])
 X0test_SE = np.stack((Q0map, P0map, np.zeros(Ntest))).T
 for ipart in range(0, Ntest):
