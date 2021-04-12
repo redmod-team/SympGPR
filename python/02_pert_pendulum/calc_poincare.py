@@ -11,7 +11,8 @@ def zdot(t, z): #perturbed pendulum
     ydot=-e*(0.3*y*np.sin(2*t) + 0.7*y*np.sin(3*t)) - om**2*np.sin(x)
     return np.hstack([xdot,ydot])
 
-#%%
+#%% see Burby et al. (2020): Fast neural Poincaré maps for toroidal magnetic fields
+# Los Alamos technical report LA-UR-20-24873
 def gen_samples_circle(origin, radius, n_samples):
     s_radius = .5*radius**2
     seq = ghalton.Halton(2)
