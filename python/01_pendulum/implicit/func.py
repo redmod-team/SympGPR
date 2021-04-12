@@ -8,6 +8,7 @@ Created on Tue Apr 21 16:47:00 2020
 import numpy as np
 from scipy.optimize import newton
 from scipy.linalg import solve_triangular
+from scipy.sparse.linalg import eigsh
 import scipy
 from sklearn.metrics import mean_squared_error 
 
@@ -95,17 +96,25 @@ def solve_cholesky(L, b):
         lower=False, check_finite=False)
 
 # negative log-posterior
-def nll_chol(hyp, x, y, N, buildK = build_K):
-    K = np.empty((N, N))
+def nll_chol(hyp, x, y, N):
+    neig = len(x)
+    K = np.empty((N, N), order='F')
     build_K(x, x, hyp[:-1], K)
     Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
-    L = scipy.linalg.cholesky(Ky, lower = True)
-    alpha = solve_cholesky(L, y)
-    ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
+    try:
+        L = scipy.linalg.cholesky(Ky, lower = True, check_finite = False)
+        alpha = solve_cholesky(L, y)
+        ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
+        return ret
+    except:
+        print('Warning! Fallback to eig solver!')
+        w, Q = eigsh(Ky, neig, tol=max(1e-6*np.abs(hyp[-1]), 1e-15))
+        alpha = Q.dot(np.diag(1.0/w).dot(Q.T.dot(y)))    
+        ret = 0.5*y.T.dot(alpha) + 0.5*(np.sum(np.log(w)) + (len(x)-neig)*np.log(np.abs(hyp[-1])))
     return ret
  
 def energy(x, U0): 
-    return x[1]**2/2 + U0*(1 - np.cos(x[0]))
+    return x[1]**2/2 + U0*(1 - np.cos(x[0]+np.pi))
 
 def guessP(x, y, hypp, xtrainp, ztrainp, Kyinvp, N):    
     Ntest = 1

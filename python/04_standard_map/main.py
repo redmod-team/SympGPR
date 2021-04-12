@@ -10,7 +10,7 @@ from scipy.optimize import minimize
 from func import (build_K, buildKreg, applymap, nll_chol, applymap_expl, nll_expl)
 import tkinter
 import matplotlib
-# matplotlib.use('TkAgg')
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error 
 import scipy
@@ -18,11 +18,11 @@ import ghalton
 import random
 import time
 #%% init parameters
-k = 6.6     # stochasticity parameter
-N = 30      #training data
-nm = 1000   # map applications
+k = 2.0   # stochasticity parameter
+N = 20      #training data
+nm = 100   # map applications
 Ntest = 30  # test data
-sig2_n = 1e-8 #noise**2 in observations
+sig2_n = 1e-12 #noise**2 in observations
 idx = 1
 def StandardMap(x, k):
     outJ = (x[1] + k*np.sin(x[0]))
@@ -201,16 +201,16 @@ plt.ylabel(r"I", fontsize = 20)
 plt.tight_layout()
 
 plt.subplot(1,3,2)
-plt.plot(fintmap[0], fintmap[1],  color = 'darkgrey', marker = 'o', linestyle = 'None',  markersize = 0.5)
+plt.plot(fintmap[0], fintmap[1],  color = 'dodgerblue', marker = 'o', linestyle = 'None',  markersize = 0.5)
 plt.xlabel(r"$\theta$", fontsize = 20)
 plt.ylabel(r"I", fontsize = 20)
 plt.tight_layout()
 
 plt.subplot(1,3,3)
-plt.plot(fintmap[0], fintmap[1],  color = 'darkgrey', marker = 'o', linestyle = 'None',  markersize = 0.5)
+plt.plot(fintmap[0], fintmap[1],  color = 'dodgerblue', marker = 'o', linestyle = 'None',  markersize = 0.5)
 for i in range(0, Ntest):
     plt.plot(qmap[:,i], pmap[:,i], 'k^', label = 'GP', markersize = 0.5)
 plt.xlabel(r"$\theta$", fontsize = 20)
 plt.ylabel(r"I", fontsize = 20)
 plt.tight_layout()
-# plt.show(block = True)
+plt.show(block = True)

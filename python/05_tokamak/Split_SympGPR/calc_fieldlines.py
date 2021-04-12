@@ -7,13 +7,10 @@ from fieldlines import fieldlines
 import ghalton
 import random
 
-#
-# Attention: Variables are [pth, th, ph], so momentum in first component and
-#            "time" in third. Change to usual Z = z[:,1::-1] before using!
-#
-N = 60 # training data N = 70 for eps = 0.001
-nphmap = 4
-nm = 100*nphmap
+
+N = 70 # training data N = 70 for eps = 0.001
+nphmap = 4 # number of splits
+nm = 1000*nphmap
 nturn = 2 # Number of full turns
 nph = 100     # Number of steps per turn
 mod_m = -3
@@ -44,7 +41,7 @@ for ipart in range(0, N):
     
 #%%
 
-print('finish')
+print('Integration of training data done')
 ind = int(nph/nphmap)
 
 # organize training input data q = (N, nphmap), Q = (N, nphmap)
@@ -83,6 +80,7 @@ X0test = np.stack((Q0map, P0map, np.zeros(Ntest))).T
 
 start = time()
 yinttest = zeros([nph*nturntest + 1, 3, Ntest])
+print('Integration of reference data ...')
 for ipart in range(0, Ntest):
     fieldlines.init(nph=nph, am=mod_m, an=mod_n, aeps=eps, aphase=0.0, arlast=X0test[ipart,0])
     X0test[ipart, 0] = qe/c*fieldlines.ath(X0test[ipart,0], X0test[ipart,1], X0test[ipart,2])
@@ -98,26 +96,4 @@ for ipart in range(0, Ntest):
 yinttest[:,0] = yinttest[:, 0]*1e2
 yinttest[:, 1] = yinttest[:, 1]
 end = time()
-print('Time high accuracy sympl. Euler: ', end-start)
-
-# low accuracy sympl. Euler
-start = time()
-nph_SE = 16
-yintSE = zeros([nph_SE*nturntest + 1, 3, Ntest])
-X0test_SE = np.stack((Q0map, P0map, np.zeros(Ntest))).T
-for ipart in range(0, Ntest):
-    fieldlines.init(nph=nph_SE, am=mod_m, an=mod_n, aeps=eps, aphase=0.0, arlast=X0test_SE[ipart,0])
-    X0test_SE[ipart, 0] = qe/c*fieldlines.ath(X0test_SE[ipart,0], X0test_SE[ipart,1], X0test_SE[ipart,2])
-    temp = zeros([nph_SE*nturntest + 1, 3])
-    temp[0,:] = [X0test_SE[ipart,0], X0test_SE[ipart,1], 0.0]
-    
-    
-    for kph in arange(nph_SE*nturntest):
-        temp[kph+1, :] = temp[kph, :]
-        fieldlines.timestep(temp[kph+1, :])
-    yintSE[:,:,ipart] = temp
-yintSE[:,0] = yintSE[:, 0]*1e2
-yintSE[:, 1] = yintSE[:, 1]
-
-end = time()
-print('Time low accuracy sympl. Euler: ', end-start)
+print('Time reference data(high accuracy sympl. Euler): ', end-start)

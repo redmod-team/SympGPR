@@ -134,7 +134,7 @@ plt.tight_layout()
 
 plt.subplot(1,3,2)
 for i in range(0, Ntest):
-    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'darkgrey', marker = 'o', linestyle = 'None', markersize = 0.5)
+    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'dodgerblue', marker = 'o', linestyle = 'None', markersize = 0.5)
 plt.ylim([-2.8, 2.8])
 plt.xlabel('$q$', fontsize = 20)
 plt.ylabel('$p$', fontsize = 20)
@@ -142,7 +142,7 @@ plt.tight_layout()
 
 plt.subplot(1,3,3)
 for i in range(0, Ntest):
-    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'darkgrey', marker = 'o', linestyle = 'None', markersize = 0.5)
+    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'dodgerblue', marker = 'o', linestyle = 'None', markersize = 0.5)
     plt.plot(qmap[:,i], pmap[:,i], 'k^', markersize = 0.5)
 plt.ylim([-2.8, 2.8])
 plt.xlabel('$q$', fontsize = 20)
@@ -150,10 +150,9 @@ plt.ylabel('$p$', fontsize = 20)
 plt.tight_layout()
 
 plt.figure()
-for i in range(0, qmap.shape[1]):
-    plt.plot(H[:,i]/(np.mean(H[:,i])))
-plt.xlabel('t', fontsize = 20)
-plt.ylabel(r'H/$\bar{H}$', fontsize = 20)
+plt.semilogy((H[:,0]-H[0,0])/H[0,0], 'k')
+plt.xlabel('n', fontsize = 20)
+plt.ylabel(r'$Log_{10} |(H(t)-H(0))/H(0)|$', fontsize = 15)
 plt.title('Energy Expl. SympGPR')
 plt.tight_layout()
-plt.show(block=True)
+plt.show()

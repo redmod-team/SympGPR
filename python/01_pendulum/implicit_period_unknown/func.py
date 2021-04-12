@@ -105,7 +105,7 @@ def nll_chol(hyp, x, y, N, buildK = build_K):
     return ret
  
 def energy(x, U0): 
-    return x[1]**2/2 + U0*(1 - np.cos(x[0]))
+    return x[1]**2/2 + U0*(1 - np.cos(x[0]+np.pi))
 
 def guessP(x, y, hypp, xtrainp, ztrainp, Kyinvp, N):    
     Ntest = 1

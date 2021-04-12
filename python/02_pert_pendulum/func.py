@@ -11,7 +11,7 @@ from scipy.linalg import solve_triangular
 import scipy
 from sklearn.metrics import mean_squared_error 
 from fortran.sympgpr import sympgpr
-
+from scipy.sparse.linalg import eigsh
 from kernels import *
 
 def f_kern(x, y, x0, y0, l):
@@ -130,7 +130,7 @@ def build_dK(xin, x0in, hyp):
     
 
 def nll_grad_reg(hyp, x, y, N):
-    K = np.empty((N, N))
+    K = np.empty((N, N), order = 'F')
     buildKreg(x, x, hyp[:-1], K)
     Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
     Kyinv = np.linalg.inv(Ky)                # invert GP matrix
@@ -146,7 +146,7 @@ def nll_grad_reg(hyp, x, y, N):
     return nlp_val, nlp_grad
 
 def nll_grad(hyp, x, y, N):
-    K = np.empty((N, N))
+    K = np.empty((N, N), order = 'F')
     build_K(x, x, hyp[:-1], K)
     Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
     Kyinv = np.linalg.inv(Ky)                # invert GP matrix
@@ -187,20 +187,22 @@ def nll_chol_reg(hyp, x, y, N):
     return ret
 # negative log-posterior
 def nll_chol(hyp, x, y, N):
+    neig = len(x)
     K = np.empty((N, N), order='F')
     build_K(x, x, hyp[:-1], K)
     Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
-    L = scipy.linalg.cholesky(Ky, lower = True)
-    alpha = solve_cholesky(L, y)
-    ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
+    try:
+        L = scipy.linalg.cholesky(Ky, lower = True, check_finite = False)
+        alpha = solve_cholesky(L, y)
+        ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
+        return ret
+    except:
+        print('Warning! Fallback to eig solver!')
+        w, Q = eigsh(Ky, neig, tol=max(1e-6*np.abs(hyp[-1]), 1e-15))
+        alpha = Q.dot(np.diag(1.0/w).dot(Q.T.dot(y)))    
+        ret = 0.5*y.T.dot(alpha) + 0.5*(np.sum(np.log(w)) + (len(x)-neig)*np.log(np.abs(hyp[-1])))
     return ret
- 
-# def guessP(x, y, hypp, xtrainp, ztrainp, Kyinvp, N):    
-#     Ntest = 1
-#     Kstar = np.empty((Ntest, int(len(xtrainp)/2)))
-#     buildKreg(np.hstack((x,y)), xtrainp, hypp, Kstar)
-#     Ef = Kstar.dot(Kyinvp.dot(ztrainp))
-#     return Ef
+
 
 def guessP(x, y, hypp, xtrainp, ztrainp, Kyinvp):
     Ntrain = len(xtrainp)//2

@@ -130,11 +130,6 @@ def nll_chol_reg(hyp, x, y, N):
     K = np.empty((N, N), order='F')
     buildKreg(x, x, hyp[:-1], K)
     Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
-    # L = scipy.linalg.cholesky(Ky, lower = True)
-    # alpha = solve_cholesky(L, y)
-    # ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
-    # return ret
-    # if (neig <= 0 or neig > 0.05*len(x)):
     try:
         L = scipy.linalg.cholesky(Ky, lower = True)
         alpha = solve_cholesky(L, y)
@@ -143,15 +138,6 @@ def nll_chol_reg(hyp, x, y, N):
     except:
         print('Warning! Fallback to eig solver!')
         w, Q = eigsh(Ky, neig, tol=max(1e-6*np.abs(hyp[-1]), 1e-15))
-    # while np.abs(w[0]-hyp[-1])/hyp[-1] > 1e-6 and neig < len(x):
-    #     if neig > 0.05*len(x):  # TODO: get more stringent criterion
-    #         try:
-    #             return nll_chol(hyp, x, y, build_K)
-    #         except:
-    #             print('Warning! Fallback to eig solver!')
-    #     neig =  2*neig
-    #     w, Q = eigsh(Ky, neig, tol=max(1e-6*hyp[-1], 1e-15))
-
         alpha = Q.dot(np.diag(1.0/w).dot(Q.T.dot(y)))    
     
 
@@ -160,11 +146,10 @@ def nll_chol_reg(hyp, x, y, N):
 
 # negative log-posterior
 def nll_chol(hyp, x, y, N):
-    neig = len(x)
+    neig = len(x)//2
     K = np.empty((N, N), order='F')
     build_K(x, x, hyp[:-1], K)
     Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
-    # if (neig <= 0 or neig > 0.05*len(x)):
     try:
         L = scipy.linalg.cholesky(Ky, lower = True)
         alpha = solve_cholesky(L, y)
@@ -173,15 +158,6 @@ def nll_chol(hyp, x, y, N):
     except:
         print('Warning! Fallback to eig solver!')
         w, Q = eigsh(Ky, neig, tol=max(1e-6*np.abs(hyp[-1]), 1e-15))
-    # while np.abs(w[0]-hyp[-1])/hyp[-1] > 1e-6 and neig < len(x):
-        # if neig > 0.05*len(x):  # TODO: get more stringent criterion
-            # try:
-                # return nll_chol(hyp, x, y, build_K)
-            # except:
-                # print('Warning! Fallback to eig solver!')
-        # neig =  2*neig
-        # w, Q = eigsh(Ky, neig, tol=max(1e-6*hyp[-1], 1e-15))
-
         alpha = Q.dot(np.diag(1.0/w).dot(Q.T.dot(y)))    
     
 
@@ -225,12 +201,7 @@ def applymap_tok(nphmap, nm, Ntest, Q0map, P0map, xtrainp, ztrainp, Kyinvp, hypp
                 else:
                     # set new P including Newton for implicit Eq
                     pmap[i+1, k] = calcP(qmap[i,k], pmap[i, k], hyp[m, :], hypp[m, :], xtrainp[:, m], ztrainp[:, m], Kyinvp[m], xtrain[:, m], ztrain[:, m], Kyinv[m])
-                
-                    # ph = 2*np.pi/4
-                    # zk = np.array([pmap[i+1, k]*1e-2, qmap[i,k], ph])
-                    # temp = fieldlines.compute_r(zk, r_gss)
-                    # if temp > r_cut or pmap[i+1, k] < 0.0:
-                        # pmap[i+1, k] = np.nan
+            
             for k in range(0, Ntest):
                 if np.isnan(pmap[i+1, k]):
                     qmap[i+1,k] = np.nan
@@ -238,8 +209,13 @@ def applymap_tok(nphmap, nm, Ntest, Q0map, P0map, xtrainp, ztrainp, Kyinvp, hypp
                     # then: set new Q via calculating \Delta q and adding q 
                     dqmap = calcQ(qmap[i,k], pmap[i+1,k], xtrain[:, m], hyp[m, :], Kyinv[m], ztrain[:, m])
                     qmap[i+1, k] = np.mod(dqmap + qmap[i, k], 2*np.pi)
+                    ph = (2*np.pi)/nphmap*np.mod(i+1, nphmap)
+                    zk = np.array([pmap[i+1, k]*1e-2, qmap[i+1,k], ph])
+                    temp = fieldlines.compute_r(zk, r_gss)
+                    if temp > r_cut or pmap[i+1, k] < 0.0:
+                        pmap[i+1, k] = np.nan
+                        qmap[i+1, k] = np.nan
             i = i + 1
-        # i = i + 4
     return qmap, pmap
 
 def quality(qmap, pmap, H, ysint, Ntest, Nm):

@@ -1,7 +1,7 @@
 import numpy as np
 import ghalton
 import time
-nm = 1000 #map applications
+nm = 100 #map applications
 e = 0.5
 om = 0.5
 def zdot(t, z): #perturbed pendulum

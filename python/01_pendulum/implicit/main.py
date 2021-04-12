@@ -10,9 +10,9 @@ import random
 import ghalton
 from scipy.optimize import minimize
 from func import (build_K, buildKreg, applymap, nll_chol, quality)
-# import tkinter
-# import matplotlib
-# matplotlib.use('TkAgg')
+import tkinter
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error 
 from scipy.integrate import solve_ivp
@@ -21,7 +21,7 @@ import time
 
 
 def energy(x, U0): 
-    return x[1]**2/2 + U0*(1 - np.cos(x[0]))
+    return x[1]**2/2 + U0*(1 - np.cos(x[0]+np.pi))
 
 def dydt_ivp(t, y):
     ydot = np.zeros([2])
@@ -37,14 +37,30 @@ def integrate_pendulum(q0, p0, t):
         ysint.append(temp)
     return ysint
 
+def intode(y, t, dt):
+    ys = np.zeros([2, len(t)])
+    ys[0,0] = y[0]
+    ys[1,0] = y[1]            
+
+    for kt in range(1,len(t)):
+            ys[1, kt]=ys[1, kt-1] - dt*(np.sin(ys[0, kt-1] + np.pi))
+            ys[0, kt]=ys[0, kt-1] + dt*ys[1, kt]
+    return ys.T
+
+def symplEuler_pendulum(q0, p0, t, dt):
+    ysint = np.zeros([len(t), 2, len(q0)]) # initial values for y
+
+    for k in range(len(q0)):    
+        ysint[:,:, k] = intode([q0[k], p0[k]], t, dt) 
+    return ysint
 #%% init parameters
 Nm = 200 #mapping time (Nm = 200 for Fig. 3; Nm = 900 for Fig. 5)
-N = 20 #training data (N = 20 for Fig. 3; N = 30 for Fig. 5)
+N = 20 #training data (N = 20 for Fig. 3; N = 50 for Fig. 5)
 U0 = 1
-nm = 2000 # how often the map should be applied
+nm = 1000 # how often the map should be applied
 dtsymp = 0.001 #integration step for producing training data
-sig2_n = 1e-12 #noise**2 in observations
-Ntest = 1 # number of testpoints
+sig2_n = 1e-16 #noise**2 in observations
+Ntest = 15 # number of testpoints
 
 #define boundaries for training data
 qmin = 0.0
@@ -97,24 +113,23 @@ zptrain = p - P
 xtrain = np.hstack((q, P))
 ztrain = np.concatenate((zptrain, zqtrain))
 
-
+start = time.time()
 #%% set up GP
 # as indicated in Algorithm 1: Semi-implicit symplectic GP map
 #hyperparameter optimization of length scales (lq, lp)
-log10l0 = np.array((-1, -1), dtype = float)
+log10l0 = np.array((0, 0), dtype = float)
 
 #  Step 1: Usual GP regression of P over (q,p)
 #fit GP + hyperparameter optimization to have a first guess for newton for P
 xtrainp = np.hstack((q, p))
 ztrainp = P
-
+sig2p_n = sig2_n
 sigp = 2*np.amax(np.abs(ztrainp))**2
 
 def nll_transform2(log10hyp, sig, sig2n, x, y, N):
     hyp = 10**log10hyp
     return nll_chol(np.hstack((hyp, sig, [sig2n])), x, y, N)
-res = minimize(nll_transform2, np.array((log10l0)), args = (sigp, sig2_n, xtrainp, ztrainp.T.flatten(), N), method='L-BFGS-B', bounds = ((-10, 1), (-10, 1)))
-
+res = minimize(nll_transform2, np.array((log10l0)), args = (sigp, sig2p_n, xtrainp, ztrainp.T.flatten(), N), method='L-BFGS-B')#, bounds = ((-10, 1), (-10, 1)))
 
 lp = 10**res.x
 hypp = np.hstack((lp, sigp))
@@ -127,7 +142,7 @@ Kyinvp = scipy.linalg.inv(Kp + sig2_n*np.eye(Kp.shape[0]))
 # Step 2: symplectic GP regression of -Delta p and Delta q over mixed variables (q,P) according to Eq. 41
 # hyperparameter optimization for lengthscales (lq, lp) and GP fitting
 sig = 2*np.amax(np.abs(ztrain))**2
-
+log10l0 = np.array((-1, -1), dtype = float)
 def nll_transform(log10hyp, sig, sig2n, x, y, N):
     hyp = 10**log10hyp
     return nll_chol(np.hstack((hyp, sig, [sig2n])), x, y, N)
@@ -144,20 +159,20 @@ hyp = np.hstack((l, sig))
 K = np.empty((2*N, 2*N), order='F')
 build_K(xtrain, xtrain, hyp, K)
 Kyinv = scipy.linalg.inv(K + sig2_n*np.eye(K.shape[0]))
-
+end = time.time()
+print('training time: ', "{:.2f}".format(end-start), 's')
 # caluate training error
 Eftrain = K.dot(Kyinv.dot(ztrain))
 outtrain = mean_squared_error(ztrain, Eftrain)
-print('training error', "{:.1e}".format(outtrain))
+print('training error', "{0:.1e}".format(outtrain))
 
 #%% Application of symplectic map
 start = time.time()
-Q0map = np.array([2.1+np.pi])
-P0map = np.array([0.0])
 qmap, pmap = applymap(
     nm, Ntest, hyp, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv)
 end = time.time()
-print('Application time: ', end-start)
+#%%
+print("Elapsed time to predict {0:3d} steps for {1:3d} orbits: {2:.2f} s".format(nm, Ntest, end-start))
 #calculate energy
 H = energy([qmap, pmap], U0)
 
@@ -185,7 +200,7 @@ plt.tight_layout()
 
 plt.subplot(1,3,2)
 for i in range(0, Ntest):
-    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'darkgrey', marker = 'o', linestyle = 'None', markersize = 0.5)
+    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'dodgerblue', marker = 'o', linestyle = 'None', markersize = 0.5)
 plt.ylim([-2.8, 2.8])    
 plt.xlabel('$q$', fontsize = 20)
 plt.ylabel('$p$', fontsize = 20)
@@ -193,7 +208,7 @@ plt.tight_layout()
 
 plt.subplot(1,3,3)
 for i in range(0, Ntest):
-    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'darkgrey', marker = 'o', linestyle = 'None', markersize = 0.5)
+    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'dodgerblue', marker = 'o', linestyle = 'None', markersize = 0.5)
     plt.plot(qmap[:,i], pmap[:,i], 'k^', markersize = 0.5)
 plt.ylim([-2.8, 2.8])    
 plt.xlabel('$q$', fontsize = 20)
@@ -201,13 +216,23 @@ plt.ylabel('$p$', fontsize = 20)
 plt.tight_layout()
 #%%
 plt.figure()
-for i in range(0, qmap.shape[1]):
-    plt.plot(np.linspace(0, nm*dtsymp*Nm, nm), H[:,i]/np.mean(H[:,i]))
-plt.xlabel('t')
-# plt.ylim([0.5, 1.5])
-plt.ylabel(r'H/$\bar{H}$')
-plt.title('energyGP')
+plt.semilogy(np.linspace(0, nm, nm), np.abs(H[:,0]-H[0,0])/H[0,0])
+plt.xlabel('n')
+plt.ylabel(r'$Log_{10} |(H(t)-H(0))/H(0)|$', fontsize = 15)
+plt.title('Implicit SympGPR')
 
+
+#%% use symplectic Euler with approx. same accuracy
+mf = 50
+tSE = np.linspace(t0, nm*dtsymp*Nm, nm*mf)
+start = time.time()
+out = symplEuler_pendulum(Q0map.flatten(), P0map.flatten(), tSE, dtsymp*Nm/mf)
+end = time.time()
+print('Application time symplectic Euer: ', end-start)
+qmapSE = np.mod(out[:,0], 2*np.pi)
+pmapSE = out[:,1]
+HSE = energy([qmapSE, pmapSE], U0)
+EoscSE, gdSE, stdgdSE = quality(qmapSE, pmapSE, HSE, yinttest, Ntest, int(Nm/mf))
 #%%
 #calculate quality criteria as indicated in Eq. (40) and (41)
 Eosc, gd, stdgd = quality(qmap, pmap, H, yinttest, Ntest, Nm)
@@ -215,4 +240,7 @@ Eosc, gd, stdgd = quality(qmap, pmap, H, yinttest, Ntest, Nm)
 print('Geometric distance: ', "{:.1e}".format(np.mean(gd)), u"\u00B1", "{:.1e}".format(stdgd))
 print('Energy oscillation: ', "{:.1e}".format(np.mean(Eosc))) 
 
-# plt.show(block=True)
+
+print('Sympl. Euler Geometric distance: ', "{:.1e}".format(np.mean(gdSE)), u"\u00B1", "{:.1e}".format(stdgdSE))
+print('Sympl. Euler Energy oscillation: ', "{:.1e}".format(np.mean(EoscSE))) 
+plt.show(block=True)

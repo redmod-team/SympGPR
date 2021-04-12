@@ -11,7 +11,7 @@ from scipy.optimize import minimize
 from func import (build_K, buildKreg, applymap_tok, nll_chol_reg, nll_chol, nll_grad)
 import tkinter
 import matplotlib
-# matplotlib.use('TkAgg')
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 import scipy
@@ -20,7 +20,7 @@ from scipy.integrate import solve_ivp
 from mpl_toolkits.mplot3d import Axes3D
 #%% init parameters
 
-sig2_n = 1e-12 #noise**2 in observations
+sig2_n = 1e-14 #noise**2 in observations
 
 Q0map = X0test[:,1]
 P0map = X0test[:,0]*1e2
@@ -55,11 +55,11 @@ Kyinvp = scipy.linalg.inv(Kp + sig2_n*np.eye(Kp.shape[0]))
 # over mixed variables (q,P)
 # hyperparameter optimization for lengthscales (lq, lp) and GP fitting
 
-def nll_transform_grad(log10hyp, sig2n, x, y, N):
+def nll_transform(log10hyp, sig2n, x, y, N):
     hyp = log10hyp
     return nll_chol(np.hstack((hyp, [sig2n])), x, y, N)
 
-res = minimize(nll_transform_grad, np.array((0.5, 0.5, 10)),
+res = minimize(nll_transform, np.array((0.5, 0.5, 10)),
     args = (sig2_n, xtrain, ztrain.T.flatten(), 2*N), method='L-BFGS-B')
 
 sol1 = res.x[0:2]
@@ -83,10 +83,7 @@ outtrain = mean_squared_error(ztrain, Eftrain)
 print('training error', "{:.1e}".format(outtrain))
 
 #%% Application of symplectic map
-import pickle
-data = (nm, Ntest, hyp, hypp, Q0map, P0map, xtrainp, ztrainp,
-    Kyinvp, xtrain, ztrain, Kyinv)
-pickle.dump(data, open('test.pickle', 'wb'))
+
 qmap, pmap = applymap_tok(
     nm, Ntest, hyp, hypp, Q0map, P0map, xtrainp, ztrainp,
     Kyinvp, xtrain, ztrain, Kyinv)
@@ -125,4 +122,4 @@ plt.xlabel(r"$\vartheta$", fontsize = 20)
 plt.ylabel(r"$p_\vartheta$", fontsize = 20)
 plt.ylim([0.007, 0.06])
 plt.tight_layout()
-# plt.show(block = True)
+plt.show(block = True)

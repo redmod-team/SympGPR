@@ -12,18 +12,18 @@ from scipy.optimize import minimize
 from func import (integrate_pendulum, build_K, buildKreg, applymap, nll_chol, energy, quality)
 import tkinter
 import matplotlib
-# matplotlib.use('TkAgg')
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error 
 import scipy
 
 #%% init parameters
-Nm = 200 #mapping time (Nm = 200 for Fig. 3; Nm = 900 for Fig. 5)
-N = 70 #training data (N = 20 for Fig. 3; N = 30 for Fig. 5)
+Nm = 100 #mapping time 
+N = 50 #training data 
 U0 = 1 
-nm = 200 # how often the map should be applied
+nm = 1000 # how often the map should be applied
 dtsymp = 0.001 #integration step for producing training data
-sig2_n = 1e-8 #noise**2 in observations
+sig2_n = 1e-10 #noise**2 in observations
 Ntest = 15 # number of testpoints
 
 #define boundaries for training data
@@ -100,7 +100,7 @@ res = minimize(nll_transform2, np.array((log10l0)), args = (sigp, 1e-6, xtrainp,
 lp = 10**res.x
 hypp = np.hstack((lp, sigp))
 print('Optimized lengthscales for regular GP: lq =', "{:.2f}".format(lp[0]), 'lp = ', "{:.2f}".format(lp[1]))
-print(0.5/lp[2])
+
 # build K and its inverse
 Kp = np.zeros((N, N))
 buildKreg(xtrainp, xtrainp, hypp, Kp)
@@ -109,7 +109,7 @@ Kyinvp = scipy.linalg.inv(Kp + sig2_n*np.eye(Kp.shape[0]))
 # Step 2: symplectic GP regression of -Delta p and Delta q over mixed variables (q,P) according to Eq. 41
 # hyperparameter optimization for lengthscales (lq, lp) and GP fitting
 sig = 2*np.amax(np.abs(ztrain))**2
-log10l0 = np.array((-1, 0, -0.5), dtype = float)
+log10l0 = np.array((-1, 0, -0.3), dtype = float)
 
 def nll_transform(log10hyp, sig, sig2n, x, y, N):
     hyp = 10**log10hyp
@@ -166,7 +166,7 @@ plt.tight_layout()
 
 plt.subplot(1,3,2)
 for i in range(0, Ntest):
-    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'darkgrey', marker = 'o', linestyle = 'None', markersize = 0.5)
+    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'dodgerblue', marker = 'o', linestyle = 'None', markersize = 0.5)
 plt.ylim([-2.8, 2.8])    
 plt.xlabel('$q$', fontsize = 20)
 plt.ylabel('$p$', fontsize = 20)
@@ -174,7 +174,7 @@ plt.tight_layout()
 
 plt.subplot(1,3,3)
 for i in range(0, Ntest):
-    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'darkgrey', marker = 'o', linestyle = 'None', markersize = 0.5)
+    plt.plot(yinttest[:,0,i], yinttest[:,1,i], color = 'dodgerblue', marker = 'o', linestyle = 'None', markersize = 0.5)
     plt.plot(qmap[:,i], pmap[:,i], 'k^', markersize = 0.5)
 plt.ylim([-2.8, 2.8])    
 plt.xlabel('$q$', fontsize = 20)
@@ -182,12 +182,10 @@ plt.ylabel('$p$', fontsize = 20)
 plt.tight_layout()
 #%%
 plt.figure()
-for i in range(0, qmap.shape[1]):
-    plt.plot(np.linspace(0, nm*dtsymp*Nm, nm), H[:,i]/np.mean(H[:,i]))
-plt.xlabel('t')
-# plt.ylim([0.5, 1.5])
-plt.ylabel(r'H/$\bar{H}$')
-plt.title('energyGP')
+plt.semilogy(np.linspace(0, nm, nm), np.abs(H[:,4]-H[0,4])/H[0,4])
+plt.xlabel('n')
+plt.ylabel(r'$Log_{10} |(H(t)-H(0))/H(0)|$', fontsize = 15)
+plt.title('Implicit SympGPR')
 
 #%%
 #calculate quality criteria as indicated in Eq. (40) and (41)
@@ -196,4 +194,4 @@ Eosc, gd, stdgd = quality(qmap, pmap, H, yinttest, Ntest, Nm)
 print('Geometric distance: ', "{:.1e}".format(np.mean(gd)), u"\u00B1", "{:.1e}".format(stdgd))
 print('Energy oscillation: ', "{:.1e}".format(np.mean(Eosc))) 
 
-# plt.show(block=True)
+plt.show(block=True)
