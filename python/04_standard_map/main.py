@@ -16,18 +16,18 @@ from sklearn.metrics import mean_squared_error
 import scipy
 import ghalton
 import random
+import time
 #%% init parameters
-k = 1.0     # stochasticity parameter
+k = 2.0   # stochasticity parameter
 N = 20      #training data
-nm = 1000   # map applications
-Ntest = 18  # test data
-sig2_n = 1e-8 #noise**2 in observations
-
+nm = 100   # map applications
+Ntest = 30  # test data
+sig2_n = 1e-12 #noise**2 in observations
+idx = 1
 def StandardMap(x, k):
     outJ = (x[1] + k*np.sin(x[0]))
     outth = (x[0] + outJ)
     return [outth, outJ]
-
 
 def StandardMapIterate(k, nm, N, X0):
     f = np.zeros((2, N, nm))
@@ -41,13 +41,13 @@ def StandardMapIterate(k, nm, N, X0):
 # sample initial data points from halton sequence
 seq = ghalton.Halton(2)
 X0 = seq.get(N)*np.array([2*np.pi, 2*np.pi])
-fmap = StandardMapIterate(k, 2, N, X0.T)
+fmap = StandardMapIterate(k, idx + 1, N, X0.T)
 
 #set training data
 q = fmap[0, :, 0]
 p = fmap[1, :, 0]
-Q = fmap[0, :, 1]
-P = fmap[1, :, 1]
+Q = fmap[0, :, idx]
+P = fmap[1, :, idx]
 
    
 zqtrain = Q - q
@@ -65,7 +65,7 @@ pminmap = np.array(0)
 pmaxmap = np.array(2*np.pi)
 
 #set initial conditions (q0, p0) randomly for test data
-random.seed(2)
+random.seed(0)
 q0map = np.linspace(qminmap,qmaxmap,Ntest)
 p0map = np.linspace(pminmap,pmaxmap,Ntest)
 q0map = random.sample(list(q0map), Ntest)
@@ -83,7 +83,7 @@ yinttest = StandardMapIterate(k, nm, Ntest, X0test.T)
 method = 'implicit'
 if method == 'implicit':
     log10l0 = np.array((-1, -1), dtype = float)
-    
+    start = time.time()
     #  Step 1: Usual GP regression of P over (q,p)
     #fit GP + hyperparameter optimization to have a first guess for newton for P
     xtrainp = np.hstack((q, p))
@@ -118,8 +118,10 @@ if method == 'implicit':
     sol1 = 10**res.x
     
     l = [np.abs(sol1[0]), np.abs(sol1[1])]
+    end = time.time()
     print('Optimized lengthscales for mixed GP: lq =', "{:.2f}".format(l[0]), 'lp = ', "{:.2f}".format(l[1]), 'sig = ', "{:.2f}".format(sig))
     
+    print('Training time: ', end-start)
     #%%
     #build K(x,x') and regularized inverse with sig2_n
     # K(x,x') corresponds to L(q,P,q',P') given in Eq. (38) 
@@ -134,8 +136,11 @@ if method == 'implicit':
     print('training error', "{:.1e}".format(outtrain))
     
     #%% Application of symplectic map
+    start = time.time()
     outq, outp, pdiff = applymap(
         nm, Ntest, hyp, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv)
+    end = time.time()
+    print('Application time: ', end-start)
 #%%
 elif method == 'explicit':
     # use kernels_expl_per_q_sq_p.pyd for sum kernel in func.py
@@ -144,6 +149,7 @@ elif method == 'explicit':
     # hyperparameter optimization for lengthscales (lq, lp) and GP fitting
     # this is the explicit method
     # lq and lp are trained separately
+    start = time.time()
     sig = 2*np.amax(np.abs(ztrain))**2
     log10l0 = np.array((1), dtype = float)
     def nll_transform_expl(log10hyp, sig, sig2n, x, y, N, ind):
@@ -157,7 +163,7 @@ elif method == 'explicit':
     res_lq = minimize(nll_transform_expl, np.array((1)), args = (sig, 1e-8, xtrain, zptrain.T.flatten(), 2*N, 0), method='L-BFGS-B')#, bounds = (-2, 2))#, 
     res_lp = minimize(nll_transform_expl, np.array((1)), args = (sig, 1e-8, xtrain, zqtrain.T.flatten(), 2*N, 1), method='L-BFGS-B')#, bounds = ((-2, 2), (-2, 2)),tol= 1e-8)#, 
 
-
+    print('training time: ', time.time()-start)
     sol1 = 10**res_lq.x
     sol2 = 10**res_lp.x
     print(res_lq.success)
@@ -195,13 +201,13 @@ plt.ylabel(r"I", fontsize = 20)
 plt.tight_layout()
 
 plt.subplot(1,3,2)
-plt.plot(fintmap[0], fintmap[1],  color = 'darkgrey', marker = 'o', linestyle = 'None',  markersize = 0.5)
+plt.plot(fintmap[0], fintmap[1],  color = 'dodgerblue', marker = 'o', linestyle = 'None',  markersize = 0.5)
 plt.xlabel(r"$\theta$", fontsize = 20)
 plt.ylabel(r"I", fontsize = 20)
 plt.tight_layout()
 
 plt.subplot(1,3,3)
-plt.plot(fintmap[0], fintmap[1],  color = 'darkgrey', marker = 'o', linestyle = 'None',  markersize = 0.5)
+plt.plot(fintmap[0], fintmap[1],  color = 'dodgerblue', marker = 'o', linestyle = 'None',  markersize = 0.5)
 for i in range(0, Ntest):
     plt.plot(qmap[:,i], pmap[:,i], 'k^', label = 'GP', markersize = 0.5)
 plt.xlabel(r"$\theta$", fontsize = 20)

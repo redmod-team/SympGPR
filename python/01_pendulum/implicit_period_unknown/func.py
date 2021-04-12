@@ -8,7 +8,6 @@ Created on Tue Apr 21 16:47:00 2020
 import numpy as np
 from scipy.optimize import newton
 from scipy.linalg import solve_triangular
-from scipy.sparse.linalg import eigsh
 import scipy
 from sklearn.metrics import mean_squared_error 
 
@@ -17,16 +16,16 @@ from scipy.integrate import solve_ivp
 from kernels import *
 
 def f_kern(x, y, x0, y0, l):
-    return kern_num(x,y,x0,y0,l[0], l[1])
+    return kern_num(x,y,x0,y0,l[0], l[1], l[2])
 
 def d2kdxdx0(x, y, x0, y0, l):
-    return d2kdxdx0_num(x,y,x0,y0,l[0], l[1])
+    return d2kdxdx0_num(x,y,x0,y0,l[0], l[1], l[2])
 
 def d2kdydy0(x, y, x0, y0, l):
-    return d2kdydy0_num(x,y,x0,y0,l[0], l[1])
+    return d2kdydy0_num(x,y,x0,y0,l[0], l[1], l[2])
 
 def d2kdxdy0(x, y, x0, y0, l):
-    return d2kdxdy0_num(x,y,x0,y0,l[0], l[1])
+    return d2kdxdy0_num(x,y,x0,y0,l[0], l[1], l[2])
 
 def d2kdydx0(x, y, x0, y0, l):
     return d2kdxdy0(x, y, x0, y0, l)
@@ -96,21 +95,13 @@ def solve_cholesky(L, b):
         lower=False, check_finite=False)
 
 # negative log-posterior
-def nll_chol(hyp, x, y, N):
-    neig = len(x)
-    K = np.empty((N, N), order='F')
+def nll_chol(hyp, x, y, N, buildK = build_K):
+    K = np.empty((N, N))
     build_K(x, x, hyp[:-1], K)
     Ky = K + np.abs(hyp[-1])*np.diag(np.ones(N))
-    try:
-        L = scipy.linalg.cholesky(Ky, lower = True, check_finite = False)
-        alpha = solve_cholesky(L, y)
-        ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
-        return ret
-    except:
-        print('Warning! Fallback to eig solver!')
-        w, Q = eigsh(Ky, neig, tol=max(1e-6*np.abs(hyp[-1]), 1e-15))
-        alpha = Q.dot(np.diag(1.0/w).dot(Q.T.dot(y)))    
-        ret = 0.5*y.T.dot(alpha) + 0.5*(np.sum(np.log(w)) + (len(x)-neig)*np.log(np.abs(hyp[-1])))
+    L = scipy.linalg.cholesky(Ky, lower = True)
+    alpha = solve_cholesky(L, y)
+    ret = 0.5*y.T.dot(alpha) + np.sum(np.log(L.diagonal()))
     return ret
  
 def energy(x, U0): 

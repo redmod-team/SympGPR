@@ -16,6 +16,7 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error 
 import scipy
+import time
 from mpl_toolkits.mplot3d import Axes3D
 import henon
 #%% init parameters
@@ -119,8 +120,8 @@ test_samples[:,1] = np.array(p0map)
 #%% set up GP
 # as indicated in Algorithm 1: Semi-implicit symplectic GP map
 #hyperparameter optimization of length scales (lq, lp)
-
-log10l0 = np.array((0,0), dtype = float)
+start = time.time()
+log10l0 = np.array((0, 0), dtype = float)
 
 #  Step 1: Usual GP regression of P over (q,p)
 #fit GP + hyperparameter optimization to have a first guess for newton for P
@@ -172,7 +173,8 @@ Kyinv = scipy.linalg.inv(K + sig2_n*np.eye(K.shape[0]))
 Eftrain = K.dot(Kyinv.dot(ztrain))
 outtrain = mean_squared_error(ztrain, Eftrain)
 print('training error', "{:.1e}".format(outtrain))
-
+end = time.time()
+print('training time', end-start)
 #%% Application of symplectic map
 qmap, pmap = applymap_henon(
     nm, Ntest, hyp, hypp, Q0map, P0map, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv)

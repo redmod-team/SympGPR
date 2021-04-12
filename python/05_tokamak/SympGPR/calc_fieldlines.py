@@ -5,39 +5,39 @@ from common import f, qe, c
 import common
 import tkinter
 import matplotlib
-# matplotlib.use('TkAgg')
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from fieldlines import fieldlines
 import ghalton
-from profit.util.halton import halton
 from random import randint
 import random
 #
 # Attention: Variables are [pth, th, ph], so momentum in first component and
 #            "time" in third. Change to usual Z = z[:,1::-1] before using!
 #
-N = 78
-nm = 2000
+N = 80
+nm = 1000
 nturn = 2 # Number of full turns
 nph = 32     # Number of steps per turn
 
 nphmap = 1
 eps = 0.001
 seq = ghalton.Halton(3)
-X0 = seq.get(N)*array([0.26, 2*pi, 0])+array([0.1, 0, 0])#
+X0 = seq.get(N)*array([0.26, 2*pi, 0])+array([0.1, 0, 0])
 yint = zeros([nph*nturn + 1, 3, N])
 q = zeros([N])
 p = zeros([N])
 Q = zeros([N])
 P = zeros([N])
-
+mod_n = 2
+mod_m = -3
 
 for ipart in range(0, N):
     
     r0 = X0[ipart, 0]
     th0 = X0[ipart, 1]
     ph0 = X0[ipart, 2]
-    fieldlines.init(nph=nph, am=-3, an=2, aeps=eps, aphase=0.0, arlast=r0)
+    fieldlines.init(nph=nph, am=mod_m, an=mod_n, aeps=eps, aphase=0.0, arlast=r0)
     pth0 = qe/c*fieldlines.ath(r0, th0, ph0)
     
     #%%
@@ -110,10 +110,10 @@ X0testplt = np.stack((Q0map, P0map, np.zeros(Ntest))).T
 yinttest = zeros([nph*nturntest + 1, 3, Ntest])
 # plt.figure()
 for ipart in range(0, Ntest):
-    fieldlines.init(nph=nph, am=-3, an=2, aeps=eps, aphase=0.0, arlast=X0test[ipart,0])
+    fieldlines.init(nph=nph, am=mod_m, an=mod_n, aeps=eps, aphase=0.0, arlast=X0test[ipart,0])
     X0test[ipart, 0] = qe/c*fieldlines.ath(X0test[ipart,0], X0test[ipart,1], X0test[ipart,2])
     
-    fieldlines.init(nph=nph, am=-3, an=2, aeps=eps, aphase=0.0, arlast=X0testplt[ipart,0])
+    fieldlines.init(nph=nph, am=mod_m, an=mod_n, aeps=eps, aphase=0.0, arlast=X0testplt[ipart,0])
     X0testplt[ipart, 0] = qe/c*fieldlines.ath(X0testplt[ipart,0], X0testplt[ipart,1], X0testplt[ipart,2])
     temp = zeros([nph*nturntest + 1, 3])
     temp[0,:] = [X0testplt[ipart,0], X0testplt[ipart,1], 0.0]

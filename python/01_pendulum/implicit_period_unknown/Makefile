@@ -1,5 +1,5 @@
 FC = gfortran
-FFLAGS = -Wall -march=native -O3 -g -fbacktrace
+FFLAGS = -Wall -march=native -O2 -g -fbacktrace
 PYTHON = python3
 NAME = kernels
 
@@ -8,3 +8,6 @@ all: $(NAME).f90
 
 $(NAME).f90: init_func.py
 	$(PYTHON) init_func.py
+
+clean:
+	rm -f *.x *.so *.o *.mod *.pyf *.pyd *.dylib *.dll $(NAME).f90

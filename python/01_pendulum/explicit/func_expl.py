@@ -75,7 +75,7 @@ def build_K(xin, x0in, hyp, K):
     K[:,:] = sig*K[:,:]
 
 def energy(x, U0): 
-    return x[1]**2/2 + U0*(1 + np.cos(x[0]))
+    return x[1]**2/2 + U0*(1 - np.cos(x[0]+np.pi))
 
 
 # compute log-likelihood according to RW, p.19

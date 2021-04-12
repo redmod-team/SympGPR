@@ -11,3 +11,9 @@ outcmaes
 *.dylib
 *.npz
 *.png
+.vscode
+*.pickle
+*.prof
+callgrind.*
+.gitignore
+.DS_Store

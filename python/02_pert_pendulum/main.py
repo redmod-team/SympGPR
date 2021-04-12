@@ -7,7 +7,7 @@ Created on Tue Sep 29 11:42:52 2020
 
 import numpy as np
 from scipy.optimize import minimize
-from func import (build_K, buildKreg, applymap, nll_chol, nll_grad, nll_grad_reg, quality)
+from func import (build_K, buildKreg, applymap, nll_chol, nll_chol_reg, nll_grad, nll_grad_reg)
 import tkinter
 import matplotlib
 matplotlib.use('TkAgg')
@@ -29,7 +29,7 @@ lp0 = np.array((0.5, 0.5), dtype = float)
 #fit GP + hyperparameter optimization to have a first guess for newton for P
 xtrainp = np.hstack((q, p)).T
 ztrainp = P
-
+start = time.time()
 sigp = 2*np.amax(np.abs(ztrainp))**2
 
 def nll_transform2(log10hyp, sig, sig2n, x, y, N):
@@ -42,13 +42,13 @@ hypp = np.hstack((lp, sigp))
 print('Optimized lengthscales for regular GP: lq =', "{:.2f}".format(lp[0]), 'lp = ', "{:.2f}".format(lp[1]))
 
 # build K and its inverse
-Kp = np.zeros((N, N))
+Kp = np.zeros((N, N), order='F')
 buildKreg(xtrainp, xtrainp, hypp, Kp)
 Kyinvp = scipy.linalg.inv(Kp + sig2_n*np.eye(Kp.shape[0]))
 #%%
 # Step 2: symplectic GP regression of -Delta p and Delta q over mixed variables (q,P) according to Eq. 41
 # hyperparameter optimization for lengthscales (lq, lp) and GP fitting
-l0 = np.array((1,1), dtype = float)
+l0 = np.array((0.5, 0.5), dtype = float)
 sig = 2*np.amax(np.abs(ztrain))**2
 def nll_transform_grad(log10hyp, sig, sig2n, x, y, N):
     hyp = log10hyp
@@ -61,12 +61,13 @@ l = [np.abs(sol1[0]), np.abs(sol1[1])]
 print('Optimized lengthscales for mixed GP: lq =', "{:.2f}".format(l[0]), 'lp = ', "{:.2f}".format(l[1]))
 print('Opt. Success', res.success)
 print('NLL', res.fun)
-
+end = time.time()
+print('Training time needed SGPR: ', end-start)
 #%%
 #build K(x,x') and regularized inverse with sig2_n
 # K(x,x') corresponds to L(q,P,q',P') given in Eq. (38) 
 hyp = np.hstack((l, sig))
-K = np.empty((2*N, 2*N))
+K = np.empty((2*N, 2*N), order='F')
 build_K(xtrain, xtrain, hyp, K)
 Kyinv = scipy.linalg.inv(K + sig2_n*np.eye(K.shape[0]))
 
@@ -82,7 +83,7 @@ start = time.time()
 qmap, pmap = applymap(
     nm, Ntest, hyp, hypp, qs, ps, xtrainp, ztrainp, Kyinvp, xtrain, ztrain, Kyinv)
 end = time.time()
-print('Time needed SGPR: ', end-start)
+print('Application time: ', end-start)
 
 
 #%% plot results
@@ -96,14 +97,14 @@ plt.tight_layout()
 
 plt.subplot(1,3,2)
 for i in range(0, Ntest):
-    plt.plot(yinttest[0,i,:], yinttest[1,i,:], color = 'darkgrey', marker = 'o', linestyle = 'None',  markersize = 0.5)
+    plt.plot(yinttest[0,i,:], yinttest[1,i,:], color = 'dodgerblue', marker = 'o', linestyle = 'None',  markersize = 0.5)
 plt.xlabel('$q$', fontsize = 20)
 plt.ylabel('$p$', fontsize = 20)
 plt.tight_layout()
 
 plt.subplot(1,3,3)
 for i in range(0, Ntest):
-    plt.plot(yinttest[0,i,:], yinttest[1,i,:], color = 'darkgrey', marker = 'o', linestyle = 'None', markersize = 0.5)
+    plt.plot(yinttest[0,i,:], yinttest[1,i,:], color = 'dodgerblue', marker = 'o', linestyle = 'None', markersize = 0.5)
     plt.plot(qmap[:,i], pmap[:,i], 'k^', markersize = 0.5)
 plt.xlabel('$q$', fontsize = 20)
 plt.ylabel('$p$', fontsize = 20)
